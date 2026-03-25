@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel导出插件 - 哈雷酱大小姐的完美作品</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4472C4 0%, #6B9BD1 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #4472C4;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: #4472C4;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #365a9e;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(68, 114, 196, 0.3);
+        }
+
+        .btn-success {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
+        }
+
+        .btn-warning {
+            background: #ff9800;
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #e68900;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(255, 152, 0, 0.3);
+        }
+
+        .table-container {
+            overflow-x: auto;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        thead {
+            background: #4472C4;
+            color: white;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        td {
+            font-size: 13px;
+        }
+
+        tbody tr:hover {
+            background: #f5f5f5;
+        }
+
+        tbody tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+
+        .code-block {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 10px;
+            overflow-x: auto;
+        }
+
+        .code-block pre {
+            margin: 0;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .status-ok {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #4472C4;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .info-box p {
+            margin: 5px 0;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-card h3 {
+            font-size: 32px;
+            margin-bottom: 5px;
+        }
+
+        .stat-card p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 页头 -->
+        <div class="header">
+            <h1>📊 Excel导出插件 - 演示页面</h1>
+            <p>哈雷酱大小姐的完美作品 (￣▽￣)ﾉ | 专业版 v1.0</p>
+        </div>
+
+        <div class="content">
+            <!-- 系统状态 -->
+            <div class="section">
+                <div class="section-title">🔧 系统状态</div>
+                <div class="stats">
+                    <div class="stat-card">
+                        <h3 id="record-count">540</h3>
+                        <p>总记录数</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3 id="export-count">0</h3>
+                        <p>导出次数</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3 id="service-status">
+                            <span class="status status-ok">正常</span>
+                        </h3>
+                        <p>服务状态</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="section">
+                <div class="section-title">🚀 快速操作</div>
+                <div class="button-group">
+                    <button class="btn btn-primary" onclick="exportAllStudents()">
+                        📥 导出所有学生信息
+                    </button>
+                    <button class="btn btn-success" onclick="exportComputerStudents()">
+                        💻 导出计算机学院学生
+                    </button>
+                    <button class="btn btn-warning" onclick="exportMultipleSheets()">
+                        📊 导出多工作表数据
+                    </button>
+                </div>
+            </div>
+
+            <!-- 数据预览 -->
+            <div class="section">
+                <div class="section-title">📋 数据预览（前10条）</div>
+                <div class="table-container">
+                    <table id="data-table">
+                        <thead>
+                            <tr>
+                                <th>学号</th>
+                                <th>姓名</th>
+                                <th>性别</th>
+                                <th>学院</th>
+                                <th>专业</th>
+                                <th>班级</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body">
+                            <!-- 数据将通过JavaScript填充 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 使用说明 -->
+            <div class="section">
+                <div class="section-title">📖 使用说明</div>
+                <div class="info-box">
+                    <p><strong>1. 导出所有学生信息</strong>：点击蓝色按钮，导出全部540条学生记录</p>
+                    <p><strong>2. 导出计算机学院学生</strong>：点击绿色按钮，导出计算机学院的学生信息</p>
+                    <p><strong>3. 导出多工作表数据</strong>：点击橙色按钮，一次性导出多个工作表的数据</p>
+                </div>
+            </div>
+
+            <!-- 代码示例 -->
+            <div class="section">
+                <div class="section-title">💻 代码示例</div>
+                <div class="code-block">
+                    <pre>// 基础使用示例
+const exporter = new ExcelExporter();
+
+// 准备数据
+const data = [
+    { id: '2021001', name: '张三', gender: '男', college: '计算机科学与技术学院' },
+    { id: '2021002', name: '李四', gender: '女', college: '计算机科学与技术学院' }
+];
+
+// 导出配置
+const options = {
+    filename: '学生信息',
+    sheetName: '学生列表',
+    headers: {
+        id: '学号',
+        name: '姓名',
+        gender: '性别',
+        college: '学院'
+    }
+};
+
+// 执行导出
+exporter.export(data, options)
+    .then(url => console.log('下载链接:', url))
+    .catch(err => console.error('导出失败:', err));</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 引入Excel导出工具 -->
+    <script src="excel_export_frontend.js"></script>
+
+    <script>
+        // 模拟数据（实际应用中从API获取）
+        const mockData = [
+            { id: '2021001', name: '张三', gender: '男', college: '计算机科学与技术学院', major: '软件工程', class: '2101班' },
+            { id: '2021002', name: '李四', gender: '女', college: '计算机科学与技术学院', major: '人工智能', class: '2102班' },
+            { id: '2021003', name: '王五', gender: '男', college: '软件工程学院', major: '物联网工程', class: '2103班' },
+            { id: '2021004', name: '赵六', gender: '男', college: '软件工程学院', major: '软件工程', class: '2104班' },
+            { id: '2021005', name: '钱七', gender: '女', college: '信息管理学院', major: '信息管理', class: '2105班' },
+            { id: '2021006', name: '孙八', gender: '男', college: '信息管理学院', major: '档案学', class: '2106班' },
+            { id: '2021007', name: '周九', gender: '女', college: '电子工程学院', major: '电子信息', class: '2107班' },
+            { id: '2021008', name: '吴十', gender: '男', college: '电子工程学院', major: '通信工程', class: '2108班' },
+            { id: '2021009', name: '郑十一', gender: '女', college: '人工智能学院', major: '人工智能', class: '2109班' },
+            { id: '2021010', name: '王十二', gender: '男', college: '人工智能学院', major: '智能科学', class: '2110班' }
+        ];
+
+        // 初始化表格数据
+        function initTable() {
+            const tbody = document.getElementById('table-body');
+            tbody.innerHTML = '';
+
+            mockData.forEach(student => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${student.id}</td>
+                    <td>${student.name}</td>
+                    <td>${student.gender}</td>
+                    <td>${student.college}</td>
+                    <td>${student.major}</td>
+                    <td>${student.class}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // 导出所有学生信息
+        function exportAllStudents() {
+            const exporter = new ExcelExporter();
+
+            const options = {
+                filename: '所有学生信息',
+                sheetName: '学生列表',
+                headers: {
+                    id: '学号',
+                    name: '姓名',
+                    gender: '性别',
+                    college: '学院',
+                    major: '专业',
+                    class: '班级'
+                }
+            };
+
+            // 使用模拟数据（实际应用中应该从API获取完整数据）
+            const allData = [...mockData]; // 这里应该是完整的540条数据
+
+            exporter.export(allData, options)
+                .then(url => {
+                    console.log('✅ 导出成功:', url);
+                    updateExportCount();
+                })
+                .catch(err => {
+                    console.error('❌ 导出失败:', err);
+                    alert('导出失败：' + err.message);
+                });
+        }
+
+        // 导出计算机学院学生
+        function exportComputerStudents() {
+            const exporter = new ExcelExporter();
+
+            // 筛选计算机学院的学生
+            const computerStudents = mockData.filter(student =>
+                student.college === '计算机科学与技术学院'
+            );
+
+            const options = {
+                filename: '计算机学院学生信息',
+                sheetName: '计算机学院',
+                headers: {
+                    id: '学号',
+                    name: '姓名',
+                    gender: '性别',
+                    college: '学院',
+                    major: '专业',
+                    class: '班级'
+                }
+            };
+
+            exporter.export(computerStudents, options)
+                .then(url => {
+                    console.log('✅ 导出成功:', url);
+                    updateExportCount();
+                })
+                .catch(err => {
+                    console.error('❌ 导出失败:', err);
+                    alert('导出失败：' + err.message);
+                });
+        }
+
+        // 导出多工作表数据
+        function exportMultipleSheets() {
+            const exporter = new ExcelExporter();
+
+            const dataDict = {
+                '学生信息': mockData,
+                '成绩信息': [
+                    { id: '2021001', name: '张三', course: '高等数学', score: 85, credit: 4.0 },
+                    { id: '2021002', name: '李四', course: '高等数学', score: 92, credit: 4.0 },
+                    { id: '2021003', name: '王五', course: '大学英语', score: 78, credit: 3.0 }
+                ]
+            };
+
+            const options = {
+                filename: '学生完整数据',
+                headersDict: {
+                    '学生信息': {
+                        id: '学号',
+                        name: '姓名',
+                        gender: '性别',
+                        college: '学院',
+                        major: '专业',
+                        class: '班级'
+                    },
+                    '成绩信息': {
+                        id: '学号',
+                        name: '姓名',
+                        course: '课程名称',
+                        score: '成绩',
+                        credit: '学分'
+                    }
+                }
+            };
+
+            exporter.exportMultipleSheets(dataDict, options)
+                .then(url => {
+                    console.log('✅ 多工作表导出成功:', url);
+                    updateExportCount();
+                })
+                .catch(err => {
+                    console.error('❌ 导出失败:', err);
+                    alert('导出失败：' + err.message);
+                });
+        }
+
+        // 更新导出次数
+        function updateExportCount() {
+            const countEl = document.getElementById('export-count');
+            const currentCount = parseInt(countEl.textContent);
+            countEl.textContent = currentCount + 1;
+        }
+
+        // 检查服务健康状态
+        async function checkServiceHealth() {
+            try {
+                const exporter = new ExcelExporter();
+                const result = await exporter.checkHealth();
+
+                if (result.status === 'ok') {
+                    console.log('✅ Excel导出服务正常运行');
+                } else {
+                    console.warn('⚠️ Excel导出服务异常');
+                }
+            } catch (error) {
+                console.error('❌ 无法连接到Excel导出服务:', error);
+                alert('无法连接到Excel导出服务，请确保后端服务已启动！');
+            }
+        }
+
+        // 页面加载时初始化
+        window.addEventListener('DOMContentLoaded', () => {
+            initTable();
+            checkServiceHealth();
+        });
+    </script>
+</body>
+</html>

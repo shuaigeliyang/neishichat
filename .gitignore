@@ -1,0 +1,88 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 数据文件
+document_chunks.json
+retrieval_index.json
+student_handbook_extracted.json
+student_handbook_full.json
+
+# Excel 数据文件
+*.xlsx
+*.xls
+
+# 图片文件（截图等）
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# 敏感信息
+coze个人令牌.txt
+*.txt
+
+# 导出目录
+exports/
+
+# 临时和测试文件
+test.html
+kill-all.bat
+stop.bat
+restart.bat
+startup.bat
+启动内网穿透.bat
+
+# ngrok 工具
+ngrok-v3-stable-windows-amd64/
+
+# IDE 配置
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Playwright MCP
+.playwright-mcp/
+
+# Spec Workflow（可选，根据需要调整）
+.spec-workflow/
+
+# 日志文件
+*.log
+
+# 数据库文件
+*.db
+*.sqlite
+*.sqlite3
+database/
+
+# node_modules（如果有前端构建）
+node_modules/
