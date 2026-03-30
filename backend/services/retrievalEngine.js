@@ -7,20 +7,47 @@
 const fs = require('fs').promises;
 const path = require('path');
 const EmbeddingService = require('./embeddingService');
+const LocalEmbeddingService = require('./localEmbeddingService'); // ✨ 新增：本地embedding服务
 const { ZhipuRerankService, LocalRerankService } = require('./rerankService');
+const EnhancedLocalRerankService = require('./enhancedLocalRerank');
 
 class RetrievalEngine {
     constructor(apiKey, options = {}) {
-        this.embeddingService = new EmbeddingService(apiKey);
+        // ✨ 新增：选择embedding服务类型
+        this.embeddingMode = options.embeddingMode || 'api'; // 'api' 或 'local'
+
+        if (this.embeddingMode === 'local') {
+            // 使用本地embedding服务（完全免费，无限并发！）
+            const cachePath = options.cachePath || './local_embedding_cache.json';
+            this.embeddingService = new LocalEmbeddingService(cachePath);
+            console.log('✓ Embedding模式：本地模型（完全免费，无API调用）');
+        } else {
+            // 使用智谱AI API服务
+            const cachePath = options.cachePath || './embedding_cache.json';
+            this.embeddingService = new EmbeddingService(apiKey, cachePath);
+            console.log('✓ Embedding模式：智谱AI API');
+        }
+
         this.chunks = [];
         this.indexed = false;
 
         // Rerank配置
         this.rerankMode = options.rerankMode || 'hybrid'; // 'api', 'local', 'hybrid', 'none'
+        this.useEnhancedLocal = options.enhancedLocal !== false; // 默认使用增强版
         this.zhipuRerank = new ZhipuRerankService(apiKey);
-        this.localRerank = new LocalRerankService();
 
-        console.log(`✓ Rerank模式：${this.rerankMode}`);
+        // 选择使用哪个本地Rerank服务
+        if (this.useEnhancedLocal) {
+            this.localRerank = new EnhancedLocalRerankService({
+                keywordWeight: options.keywordWeight || 0.25,
+                semanticWeight: options.semanticWeight || 0.65,
+                contextWeight: options.contextWeight || 0.10
+            });
+            console.log(`✓ Rerank模式：${this.rerankMode} (增强版本地)`);
+        } else {
+            this.localRerank = new LocalRerankService();
+            console.log(`✓ Rerank模式：${this.rerankMode} (基础版本地)`);
+        }
     }
 
     /**

@@ -51,21 +51,28 @@ class DocumentProcessor {
 
         // 遍历每一页
         for (const page of this.handbookData.pages) {
-            const lines = page.text.split('\n');
+            // 预处理：过滤掉纯标点行，这是PDF提取的主要噪音来源
+            const rawLines = page.text.split('\n');
+            const lines = rawLines
+                .map(l => l.trim())
+                .filter(line => {
+                    if (!line) return false;
+                    // 过滤掉只包含标点符号和空格的行（PDF提取噪音）
+                    // 允许的字符：中文标点、英文标点、空格、制表符
+                    if (/^[，,。、；;：:！!？?"""''（）()\s\-—…·]+$/.test(line)) {
+                        return false;
+                    }
+                    // 过滤页码行（如 "— 45 —"）
+                    if (/^—\s*\d+\s*—$/.test(line)) {
+                        return false;
+                    }
+                    return true;
+                });
+
             let currentParagraph = [];  // 当前段落的内容
 
             for (let i = 0; i < lines.length; i++) {
-                const line = lines[i].trim();
-
-                // 跳过空行
-                if (!line) {
-                    // 如果段落有内容，保存它
-                    if (currentParagraph.length > 0) {
-                        this.createChunkFromParagraph(currentParagraph, page.page_num, currentChapter, currentSection, ++chunkId);
-                        currentParagraph = [];
-                    }
-                    continue;
-                }
+                const line = lines[i];
 
                 // 检查是否是章节标题（以一、二、三、或 第X章 开头）
                 if (this.isChapterTitle(line)) {
@@ -75,15 +82,16 @@ class DocumentProcessor {
                         currentParagraph = [];
                     }
 
-                    currentChapter = line;
+                    const cleanedLine = this.cleanText(line);
+                    currentChapter = cleanedLine;
                     currentSection = null;
 
                     // 章节标题也作为一个独立的文档块
                     this.chunks.push({
                         id: ++chunkId,
-                        text: line,
+                        text: cleanedLine,
                         page_num: page.page_num,
-                        chapter_title: line,
+                        chapter_title: cleanedLine,
                         section_title: '',
                         chunk_type: 'chapter_title'
                     });
@@ -98,15 +106,16 @@ class DocumentProcessor {
                         currentParagraph = [];
                     }
 
-                    currentSection = line;
+                    const cleanedLine = this.cleanText(line);
+                    currentSection = cleanedLine;
 
                     // 小节标题也作为一个独立的文档块
                     this.chunks.push({
                         id: ++chunkId,
-                        text: line,
+                        text: cleanedLine,
                         page_num: page.page_num,
                         chapter_title: currentChapter || '未分类',
-                        section_title: line,
+                        section_title: cleanedLine,
                         chunk_type: 'section_title'
                     });
                     continue;
@@ -130,7 +139,8 @@ class DocumentProcessor {
      * 从段落创建文档块
      */
     createChunkFromParagraph(paragraph, pageNum, chapter, section, id) {
-        const text = paragraph.join(' ');
+        const rawText = paragraph.join(' ');
+        const text = this.cleanText(rawText);
 
         // 跳过太短的段落
         if (text.length < 5) {
@@ -148,11 +158,71 @@ class DocumentProcessor {
     }
 
     /**
+     * 清理PDF提取的文本，修复常见的格式问题
+     * PDF提取产生的文本有大量标点噪音和断词问题
+     */
+    cleanText(text) {
+        let cleaned = text;
+
+        // 1. 移除 "条款" 前缀噪音（PDF提取产生的）
+        cleaned = cleaned.replace(/条款\s*/g, '');
+
+        // 2. 移除行内残留的独立标点符号（空格包围的标点）
+        // 多次执行以处理连续标点的情况
+        for (let i = 0; i < 5; i++) {
+            cleaned = cleaned.replace(/\s+[，,。、；;：:！!？?]+\s*/g, '');
+        }
+
+        // 3. 修复引号相关：清理引号内的多余空格
+        cleaned = cleaned.replace(/"\s+/g, '"');
+        cleaned = cleaned.replace(/\s+"/g, '"');
+        cleaned = cleaned.replace(/"\s*"/g, '""');
+        cleaned = cleaned.replace(/《\s+/g, '《');
+        cleaned = cleaned.replace(/\s+》/g, '》');
+        cleaned = cleaned.replace(/（\s+/g, '（');
+        cleaned = cleaned.replace(/\s+）/g, '）');
+
+        // 4. 修复数字和单位之间的空格（"70 分" → "70分"）
+        cleaned = cleaned.replace(/(\d+)\s+(分|元|人|门|次|年|月|日|号|页|条|款|名|期|岁)/g, '$1$2');
+
+        // 5. 合并中文之间的多余空格（"学生 在校" → "学生在校"）
+        // 这是PDF解析产生的主要问题，需要多次执行直到没有变化
+        let previous = '';
+        while (previous !== cleaned) {
+            previous = cleaned;
+            cleaned = cleaned.replace(/([\u4e00-\u9fa5])\s+([\u4e00-\u9fa5])/g, '$1$2');
+        }
+
+        // 6. 修复 "第X条" 格式
+        cleaned = cleaned.replace(/第\s*(一|二|三|四|五|六|七|八|九|十|十一|十二|十三|十四|十五|十六|十七|十八|十九|二十|二十一|二十二|二十三|二十四|二十五|二十六|二十七|二十八|二十九|三十)\s*条/g, '第$1条');
+
+        // 7. 修复括号与内容之间的多余空格
+        cleaned = cleaned.replace(/\(\s+/g, '(');
+        cleaned = cleaned.replace(/\s+\)/g, ')');
+
+        // 8. 移除中文标点前后的空格（"学生 ， 老师" → "学生，老师"）
+        cleaned = cleaned.replace(/\s+([，,。、；;：:！!？?""''））])/g, '$1');
+        cleaned = cleaned.replace(/([（（""''])\s+/g, '$1');
+
+        // 9. 移除顿号前后的空格（"升 、跳" → "升、跳"）
+        cleaned = cleaned.replace(/\s*[、]\s*/g, '、');
+
+        // 10. 压缩多余空格为单个空格
+        cleaned = cleaned.replace(/\s{2,}/g, ' ');
+
+        // 11. 去除首尾空白
+        cleaned = cleaned.trim();
+
+        return cleaned;
+    }
+
+    /**
      * 判断是否是章节标题
      */
     isChapterTitle(line) {
-        // 匹配："一、"、"二、" 或 "第一章"、"第二章" 等
-        return /^(一|二|三|四|五|六|七|八|九|十|十一|十二|十[三四五六七八九十]、|第[一二三四五六七八九十百零千]+章)/.test(line);
+        // 匹配："一、"、"二、"（必须带顿号）或 "第一章"、"第二章" 等
+        // 注意：单独的"一"、"二"后面没有顿号的不是章节标题
+        return /^(一|二|三|四|五|六|七|八|九|十|十一|十二|十[三四五六七八九十])、|^第[一二三四五六七八九十百零千]+章/.test(line);
     }
 
     /**

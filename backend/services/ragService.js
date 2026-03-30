@@ -11,7 +11,13 @@ const path = require('path');
 class RAGService {
     constructor(apiKey, options = {}) {
         this.apiKey = apiKey;
-        this.retrievalEngine = new RetrievalEngine(apiKey);
+
+        // ✨ 传递embeddingMode选项给RetrievalEngine
+        this.retrievalEngine = new RetrievalEngine(apiKey, {
+            embeddingMode: options.embeddingMode || process.env.EMBEDDING_MODE || 'api',
+            cachePath: options.cachePath
+        });
+
         this.qaGenerator = new QAGenerator(apiKey, options.model || 'glm-4-flash');
         this.initialized = false;
 

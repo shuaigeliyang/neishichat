@@ -10,7 +10,9 @@ const { authenticate } = require('../middlewares/auth');
 const RAGService = require('../../services/ragService');
 
 // 创建RAG服务实例
-const ragService = new RAGService(process.env.ZHIPU_API_KEY);
+const ragService = new RAGService(process.env.ZHIPU_API_KEY, {
+    embeddingMode: process.env.EMBEDDING_MODE || 'api'  // ✨ 从环境变量读取embedding模式
+});
 
 /**
  * 同义词映射表 - 将口语化表达转换为正式用语
@@ -52,9 +54,9 @@ const SYNONYM_MAP = {
     // 课程与学习
     '选课': '选择课程',
     '退课': '退选课程',
-    '重修': '重新学习',
+    // 注意："重修"是手册原文用词，不能替换为其他词，否则会导致RAG检索失败
     '重读': '重修',
-    '补考': '补考考试',
+    '补考': '课程补考',
     '重考': '补考',
     '补修': '补修课程',
     '免修': '免修课程',
@@ -266,9 +268,7 @@ function normalizeQuestion(question) {
         (question.includes('重修') || question.includes('补考')) &&
         !question.includes('课程') &&
         !question.includes('学生') &&
-        !question.includes('我的') &&
-        (question.includes('可不可以') || question.includes('能不能') ||
-         question.includes('怎么办') || question.includes('怎么') || question.includes('如何'))
+        !question.includes('我的')
     ) {
         console.log('📝 检测到缺少主语，自动添加"课程"主语');
         console.log(`   原始问题：${question}`);

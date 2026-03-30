@@ -110,10 +110,12 @@ function Chat({ user }) {
     lastMessageCountRef.current = messages.length;
 
     if (isNewMessage && isAutoScrollEnabled) {
-      // 稍微延迟以确保DOM已更新
-      setTimeout(() => {
-        scrollToBottom(false); // false表示不强制显示回到底部按钮
-      }, 50);
+      // 使用 requestAnimationFrame 确保DOM完全渲染后再滚动
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          scrollToBottom(false);
+        }, 50);
+      });
     }
   }, [messages, isAutoScrollEnabled]);
 
@@ -232,6 +234,13 @@ function Chat({ user }) {
     setLoading(true);
     // 发送消息时始终启用自动滚动，以便看到AI回复
     setIsAutoScrollEnabled(true);
+
+    // 立即滚动到底部，确保用户消息可见
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        scrollToBottom(false);
+      }, 100);
+    });
 
     try {
       // 🎯 智能意图识别（使用清理后的输入）

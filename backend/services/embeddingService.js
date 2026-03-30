@@ -9,11 +9,70 @@ const path = require('path');
 const axios = require('axios');
 
 class EmbeddingService {
-    constructor(apiKey) {
+    constructor(apiKey, cacheFilePath = './embedding_cache.json') {
         this.apiKey = apiKey;
         this.apiUrl = 'https://open.bigmodel.cn/api/paas/v4/embeddings';
-        this.model = 'embedding-2';  // 使用智谱AI的embedding模型
+        this.model = 'embedding-3';  // 使用智谱AI的embedding-3模型
+        this.cacheFilePath = cacheFilePath;
         this.cache = new Map();  // 缓存已计算的向量
+        this.requestQueue = [];  // 请求队列
+        this.isProcessing = false;  // 是否正在处理队列
+        this.requestInterval = 200;  // 请求间隔（毫秒）- 每秒最多5个请求
+        this.maxRetries = 3;  // 最大重试次数
+
+        // 启动时自动加载缓存
+        this.loadCacheFromFile();
+    }
+
+    /**
+     * 请求队列处理（本小姐的优雅解决方案！）
+     */
+    async enqueueRequest(requestFn) {
+        return new Promise((resolve, reject) => {
+            this.requestQueue.push({
+                fn: requestFn,
+                resolve,
+                reject,
+                retries: 0
+            });
+
+            if (!this.isProcessing) {
+                this.processQueue();
+            }
+        });
+    }
+
+    async processQueue() {
+        if (this.requestQueue.length === 0) {
+            this.isProcessing = false;
+            return;
+        }
+
+        this.isProcessing = true;
+        const task = this.requestQueue.shift();
+
+        try {
+            const result = await task.fn();
+            task.resolve(result);
+        } catch (error) {
+            // 如果是429限流错误，重试
+            if (error.response?.status === 429 && task.retries < this.maxRetries) {
+                task.retries++;
+                console.log(`⚠️ 遇到限流，重试第${task.retries}次...`);
+
+                // 指数退避
+                const backoffTime = Math.pow(2, task.retries) * 1000;
+                await this.sleep(backoffTime);
+
+                // 重新加入队列
+                this.requestQueue.unshift(task);
+            } else {
+                task.reject(error);
+            }
+        }
+
+        // 处理下一个请求，添加间隔避免限流
+        setTimeout(() => this.processQueue(), this.requestInterval);
     }
 
     /**
@@ -23,35 +82,46 @@ class EmbeddingService {
         // 检查缓存
         const cacheKey = this.hashText(text);
         if (this.cache.has(cacheKey)) {
+            console.log('✓ 使用缓存的embedding');
             return this.cache.get(cacheKey);
         }
 
-        try {
-            const response = await axios.post(
-                this.apiUrl,
-                {
-                    model: this.model,
-                    input: text
-                },
-                {
-                    headers: {
-                        'Authorization': `Bearer ${this.apiKey}`,
-                        'Content-Type': 'application/json'
+        // 使用队列包装请求（避免并发触发限流！）
+        return this.enqueueRequest(async () => {
+            try {
+                const response = await axios.post(
+                    this.apiUrl,
+                    {
+                        model: this.model,
+                        input: text
                     },
-                    timeout: 30000
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${this.apiKey}`,
+                            'Content-Type': 'application/json'
+                        },
+                        timeout: 30000
+                    }
+                );
+
+                const embedding = response.data.data[0].embedding;
+
+                // 缓存结果
+                this.cache.set(cacheKey, embedding);
+
+                // 持久化到文件（本小姐的专业优化！）
+                await this.saveCacheToFile();
+
+                return embedding;
+            } catch (error) {
+                if (error.response?.status === 429) {
+                    console.error('✗ API限流：', error.message);
+                    throw error; // 抛出以便重试
                 }
-            );
-
-            const embedding = response.data.data[0].embedding;
-
-            // 缓存结果
-            this.cache.set(cacheKey, embedding);
-
-            return embedding;
-        } catch (error) {
-            console.error('✗ 向量化失败：', error.message);
-            throw error;
-        }
+                console.error('✗ 向量化失败：', error.message);
+                throw error;
+            }
+        });
     }
 
     /**
@@ -163,7 +233,33 @@ class EmbeddingService {
     }
 
     /**
-     * 保存向量缓存
+     * 保存向量缓存到文件（本小姐的持久化优化！）
+     */
+    async saveCacheToFile() {
+        try {
+            const cacheData = Array.from(this.cache.entries());
+            await fs.writeFile(this.cacheFilePath, JSON.stringify(cacheData), 'utf-8');
+        } catch (error) {
+            console.error('✗ 保存缓存文件失败：', error.message);
+        }
+    }
+
+    /**
+     * 从文件加载向量缓存（本小姐的持久化优化！）
+     */
+    async loadCacheFromFile() {
+        try {
+            const data = await fs.readFile(this.cacheFilePath, 'utf-8');
+            const cacheData = JSON.parse(data);
+            this.cache = new Map(cacheData);
+            console.log(`✓ 已加载embedding缓存，共${this.cache.size}条记录`);
+        } catch (error) {
+            console.log('✗ 未找到缓存文件，将创建新缓存');
+        }
+    }
+
+    /**
+     * 保存向量缓存（兼容旧接口）
      */
     async saveCache(filePath) {
         try {
@@ -176,7 +272,7 @@ class EmbeddingService {
     }
 
     /**
-     * 加载向量缓存
+     * 加载向量缓存（兼容旧接口）
      */
     async loadCache(filePath) {
         try {

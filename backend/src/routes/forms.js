@@ -205,9 +205,27 @@ router.post('/generate', authenticate, async (req, res) => {
       result = await formGenerator.generateScholarshipForm(studentInfo[0]);
     } else if (finalTemplateName.includes('休学')) {
       result = await formGenerator.generateSuspensionForm(studentInfo[0]);
+    } else if (finalTemplateName.includes('复学')) {
+      result = await formGenerator.generateResumeForm(studentInfo[0]);
+    } else if (finalTemplateName.includes('请假')) {
+      result = await formGenerator.generateLeaveForm(studentInfo[0]);
+    } else if (finalTemplateName.includes('贫困生') || finalTemplateName.includes('困难')) {
+      result = await formGenerator.generatePovertyCertificationForm(studentInfo[0]);
+    } else if (finalTemplateName.includes('助学金') && !finalTemplateName.includes('助学贷款')) {
+      result = await formGenerator.generateFinancialAidForm(studentInfo[0]);
+    } else if (finalTemplateName.includes('助学贷款')) {
+      result = await formGenerator.generateStudentLoanForm(studentInfo[0]);
+    } else if (finalTemplateName.includes('成绩证明')) {
+      result = await formGenerator.generateGradeCertificateForm(studentInfo[0]);
+    } else if (finalTemplateName.includes('在读证明')) {
+      result = await formGenerator.generateEnrollmentCertificateForm(studentInfo[0]);
+    } else if (finalTemplateName.includes('毕业证明')) {
+      result = await formGenerator.generateGraduationCertificateForm(studentInfo[0]);
+    } else if (finalTemplateName.includes('学位证明')) {
+      result = await formGenerator.generateDegreeCertificateForm(studentInfo[0]);
     } else {
       // 其他表单类型暂不支持
-      return error(res, `暂不支持该表单类型："${finalTemplateName}"。\n\n目前支持的表单：\n- 学科竞赛参赛申请表\n- 转专业申请表\n- 奖学金申请表\n- 休学申请表\n\n更多表单正在开发中，敬请期待！`, 400);
+      return error(res, `暂不支持该表单类型："${finalTemplateName}"。\n\n目前支持的表单：\n【申请表】\n- 学科竞赛参赛申请表\n- 转专业申请表\n- 奖学金申请表\n- 休学申请表\n- 复学申请表\n- 请假申请表\n- 贫困生认定申请表\n- 助学金申请表\n- 助学贷款申请表\n\n【证明表】\n- 成绩证明申请表\n- 在读证明申请表\n- 毕业证明申请表\n- 学位证明申请表\n\n更多表单正在开发中，敬请期待！`, 400);
     }
 
     // 更新下载次数

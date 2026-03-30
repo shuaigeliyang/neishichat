@@ -86,7 +86,7 @@ desktop.ini
 *.db
 *.sqlite
 *.sqlite3
-database/
+# database/ - 移除此行，需要将数据库脚本部署到GitHub ✨
 
 # node_modules（如果有前端构建）
 node_modules/
