@@ -43,6 +43,14 @@ retrieval_index.json  # 58MB，太大，需要重新生成
 
 # 敏感信息
 coze个人令牌.txt
+.env
+*.key
+secrets/
+
+# 缓存文件
+embedding_cache.json
+*.cache
+
 # 保留重要的 txt 文件：
 # - requirements.txt (Python依赖)
 # - 各种提示词文件（项目文档）

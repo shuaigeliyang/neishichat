@@ -322,9 +322,17 @@ router.post('/initialize', authenticate, async (req, res) => {
  */
 router.post('/answer', authenticate, async (req, res) => {
     try {
+        console.log('\n========================================');
+        console.log('📚 [RAG] 收到问答请求');
+        console.log('========================================');
+
         const { question, options = {} } = req.body;
 
+        console.log('📝 原始问题：', question);
+        console.log('📋 请求选项：', options);
+
         if (!question) {
+            console.log('❌ 错误：问题为空');
             return res.status(400).json({
                 success: false,
                 error: '请提供问题'
@@ -334,16 +342,54 @@ router.post('/answer', authenticate, async (req, res) => {
         // 标准化问题（将口语化表达转换为正式用语）
         const normalizedQuestion = normalizeQuestion(question);
 
+        console.log('📝 标准化后问题：', normalizedQuestion);
+
         // 如果未初始化，先初始化
         if (!ragService.initialized) {
+            console.log('🔧 RAG服务未初始化，开始初始化...');
             await ragService.initialize();
+            console.log('✅ RAG服务初始化完成');
+        } else {
+            console.log('✅ RAG服务已初始化');
         }
 
-        // 调用问答服务，使用更宽松的minScore阈值
+        console.log('🚀 开始调用RAG服务...');
+
+        // 调用问答服务，增加检索数量以获得更多来源
         const result = await ragService.answer(normalizedQuestion, {
             ...options,
+            topK: options.topK || 10,  // 增加到10，这样去重后仍有足够来源
             minScore: options.minScore || 0.3  // 默认从0.5降低到0.3
         });
+
+        // ✨ 来源去重：同一页码只保留评分最高的一个
+        if (result.sources && result.sources.length > 0) {
+            const beforeCount = result.sources.length;
+
+            // 使用Map按页码分组，保留评分最高的
+            const sourceMap = new Map();
+
+            result.sources.forEach(source => {
+                const key = `${source.chapter}_${source.page}`;
+                const existing = sourceMap.get(key);
+
+                // 如果不存在，或当前source评分更高，则保留
+                if (!existing || (source.score && source.score > (existing.score || 0))) {
+                    sourceMap.set(key, source);
+                }
+            });
+
+            // 转换回数组，按评分排序
+            result.sources = Array.from(sourceMap.values()).sort((a, b) => {
+                return (b.score || 0) - (a.score || 0);
+            });
+
+            const afterCount = result.sources.length;
+
+            if (beforeCount !== afterCount) {
+                console.log(`\n✨ 来源去重：${beforeCount} 条 → ${afterCount} 条（去重 ${beforeCount - afterCount} 条）`);
+            }
+        }
 
         // 📊 Rerank统计日志 - 优化1：添加详细的Rerank验证信息
         console.log('📊 Rerank统计：');
@@ -383,7 +429,15 @@ router.post('/answer', authenticate, async (req, res) => {
         });
 
     } catch (error) {
-        console.error('问答失败：', error);
+        console.error('\n========================================');
+        console.error('❌ [RAG] 问答处理失败');
+        console.error('========================================');
+        console.error('错误类型：', error.constructor.name);
+        console.error('错误消息：', error.message);
+        console.error('错误堆栈：', error.stack);
+        console.error('问题内容：', question);
+        console.error('========================================\n');
+
         res.status(500).json({
             success: false,
             error: error.message

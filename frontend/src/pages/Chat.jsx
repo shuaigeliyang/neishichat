@@ -26,6 +26,9 @@ function Chat({ user }) {
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
   const [handbookModalVisible, setHandbookModalVisible] = useState(false);
   const [selectedPageNum, setSelectedPageNum] = useState(null);
+  // 🎯 分页状态：为每个消息独立管理来源分页（每页5条）
+  const [sourcesPageMap, setSourcesPageMap] = useState({});
+  const SOURCES_PER_PAGE = 5;
 
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
@@ -998,55 +1001,137 @@ function Chat({ user }) {
                     {/* RAG回答内容 */}
                     <Markdown>{msg.content}</Markdown>
 
-                    {/* 可点击的来源链接 */}
+                    {/* 可点击的来源链接 - 支持分页 */}
                     {msg.sources && msg.sources.length > 0 && (
                       <div style={{ marginTop: '16px' }}>
                         <Divider style={{ margin: '12px 0' }} />
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                          <BookOutlined style={{ color: '#1890ff' }} />
-                          <span style={{ fontWeight: 500, color: '#666' }}>📖 参考来源（点击查看完整内容）：</span>
-                        </div>
-                        {msg.sources.map((source, idx) => (
-                          <div
-                            key={idx}
-                            onClick={() => {
-                              setSelectedPageNum(source.page);
-                              setHandbookModalVisible(true);
-                            }}
-                            style={{
-                              padding: '8px 12px',
-                              background: '#e6f7ff',
-                              border: '1px solid #91d5ff',
-                              borderRadius: '6px',
-                              marginBottom: '8px',
-                              cursor: 'pointer',
-                              fontSize: '14px',
-                              color: '#0050b3',
-                              transition: 'all 0.2s',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '8px'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.target.style.background = '#bae7ff';
-                              e.target.style.transform = 'translateX(4px)';
-                              e.target.style.borderColor = '#69c0ff';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.target.style.background = '#e6f7ff';
-                              e.target.style.transform = 'translateX(0)';
-                              e.target.style.borderColor = '#91d5ff';
-                            }}
-                          >
-                            <BookOutlined />
-                            <span style={{ flex: 1 }}>
-                              {source.chapter || '未知章节'}（第{source.page}页）
-                            </span>
-                            <span style={{ fontSize: '12px', color: '#999' }}>
-                              点击查看 →
-                            </span>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <BookOutlined style={{ color: '#1890ff' }} />
+                            <span style={{ fontWeight: 500, color: '#666' }}>📖 参考来源：</span>
                           </div>
-                        ))}
+                          <span style={{ fontSize: '13px', color: '#999' }}>
+                            共 {msg.sources.length} 条
+                          </span>
+                        </div>
+
+                        {/* 计算当前页的来源 */}
+                        {(() => {
+                          const currentPage = sourcesPageMap[index] || 1;
+                          const totalPages = Math.ceil(msg.sources.length / SOURCES_PER_PAGE);
+                          const startIndex = (currentPage - 1) * SOURCES_PER_PAGE;
+                          const endIndex = startIndex + SOURCES_PER_PAGE;
+                          const currentSources = msg.sources.slice(startIndex, endIndex);
+
+                          return (
+                            <>
+                              {/* 当前页的来源列表 */}
+                              {currentSources.map((source, idx) => (
+                                <div
+                                  key={idx}
+                                  onClick={() => {
+                                    setSelectedPageNum(source.page);
+                                    setHandbookModalVisible(true);
+                                  }}
+                                  style={{
+                                    padding: '8px 12px',
+                                    background: '#e6f7ff',
+                                    border: '1px solid #91d5ff',
+                                    borderRadius: '6px',
+                                    marginBottom: '8px',
+                                    cursor: 'pointer',
+                                    fontSize: '14px',
+                                    color: '#0050b3',
+                                    transition: 'all 0.2s',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.target.style.background = '#bae7ff';
+                                    e.target.style.transform = 'translateX(4px)';
+                                    e.target.style.borderColor = '#69c0ff';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.target.style.background = '#e6f7ff';
+                                    e.target.style.transform = 'translateX(0)';
+                                    e.target.style.borderColor = '#91d5ff';
+                                  }}
+                                >
+                                  <BookOutlined />
+                                  <span style={{ flex: 1 }}>
+                                    {source.chapter || '未知章节'}（第{source.page}页）
+                                  </span>
+                                  <span style={{ fontSize: '12px', color: '#999' }}>
+                                    点击查看 →
+                                  </span>
+                                </div>
+                              ))}
+
+                              {/* 分页控件 */}
+                              {totalPages > 1 && (
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '12px',
+                                    marginTop: '12px',
+                                    padding: '8px',
+                                    background: '#f5f5f5',
+                                    borderRadius: '6px'
+                                  }}
+                                >
+                                  <Button
+                                    size="small"
+                                    icon={<span>←</span>}
+                                    disabled={currentPage === 1}
+                                    onClick={() => {
+                                      setSourcesPageMap(prev => ({
+                                        ...prev,
+                                        [index]: currentPage - 1
+                                      }));
+                                    }}
+                                    style={{
+                                      fontSize: '12px',
+                                      minWidth: '60px'
+                                    }}
+                                  >
+                                    上一页
+                                  </Button>
+
+                                  <span
+                                    style={{
+                                      fontSize: '13px',
+                                      color: '#666',
+                                      fontWeight: 500
+                                    }}
+                                  >
+                                    第 {currentPage} / {totalPages} 页
+                                  </span>
+
+                                  <Button
+                                    size="small"
+                                    icon={<span>→</span>}
+                                    disabled={currentPage === totalPages}
+                                    onClick={() => {
+                                      setSourcesPageMap(prev => ({
+                                        ...prev,
+                                        [index]: currentPage + 1
+                                      }));
+                                    }}
+                                    style={{
+                                      fontSize: '12px',
+                                      minWidth: '60px'
+                                    }}
+                                  >
+                                    下一页
+                                  </Button>
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                     )}
 
