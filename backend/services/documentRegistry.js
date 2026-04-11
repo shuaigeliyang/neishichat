@@ -146,7 +146,7 @@ class DocumentRegistry {
     /**
      * 更新文档状态
      */
-    async updateDocumentStatus(documentId, status, statistics = {}) {
+    async updateDocumentStatus(documentId, status, statistics = {}, error = null) {
         const doc = this.getDocumentById(documentId);
         if (!doc) {
             throw new Error(`文档不存在: ${documentId}`);
@@ -157,6 +157,16 @@ class DocumentRegistry {
 
         if (status === 'indexed') {
             doc.indexedAt = new Date().toISOString();
+        }
+
+        // 保存错误信息
+        if (error) {
+            doc.error = {
+                message: error.message || error,
+                timestamp: new Date().toISOString()
+            };
+        } else {
+            delete doc.error;
         }
 
         // 更新统计信息

@@ -151,7 +151,7 @@ export default function PolicyDocuments() {
     setDocumentsError(null)
 
     try {
-      const response = await fetch('http://localhost:3000/api/documents')
+      const response = await fetch('http://localhost:3005/api/documents')
       const result = await response.json()
 
       if (result.success) {
@@ -170,7 +170,7 @@ export default function PolicyDocuments() {
   // 获取索引状态
   const fetchIndexStatus = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/index/status')
+      const response = await fetch('http://localhost:3005/api/documents/index/status')
       const result = await response.json()
 
       if (result.success) {
@@ -181,16 +181,33 @@ export default function PolicyDocuments() {
     }
   }
 
-  // 获取已处理的文档列表
+  // 获取已处理的文档列表 - 从文档目录扫描
   const fetchProcessedDocuments = async () => {
     setProcessedDocsLoading(true)
 
     try {
-      const response = await fetch('http://localhost:3000/api/documents/processed')
+      // 使用 /api/documents 获取所有文档，然后过滤已处理的
+      const response = await fetch('http://localhost:3005/api/documents')
       const result = await response.json()
 
       if (result.success) {
-        setProcessedDocuments(result.data.documents || [])
+        // 将已处理的文档转换为 ProcessedDocument 格式
+        const indexedDocs = result.data.documents
+          .filter((doc: any) => doc.status === 'indexed')
+          .map((doc: any) => ({
+            name: doc.name || doc.displayName,
+            path: doc.directory || '',
+            files: {
+              student_handbook_full: doc.statistics?.totalPages > 0,
+              document_chunks: doc.statistics?.totalChunks > 0,
+              embedding_cache: doc.statistics?.indexedChunks > 0
+            },
+            stats: {
+              totalPages: doc.statistics?.totalPages || 0,
+              totalChunks: doc.statistics?.totalChunks || 0
+            }
+          }))
+        setProcessedDocuments(indexedDocs)
       }
     } catch (err: any) {
       console.error('获取已处理文档失败:', err)
@@ -202,7 +219,7 @@ export default function PolicyDocuments() {
   // 查看文件内容
   const handleViewFileContent = async (documentName: string, fileType: 'student_handbook_full' | 'document_chunks' | 'embedding_cache') => {
     try {
-      const response = await fetch(`http://localhost:3000/api/documents/content/${encodeURIComponent(documentName)}?type=${fileType}`)
+      const response = await fetch(`http://localhost:3005/api/documents/content/${encodeURIComponent(documentName)}?type=${fileType}`)
       const result = await response.json()
 
       if (result.success) {
@@ -241,7 +258,7 @@ export default function PolicyDocuments() {
       formData.append('description', uploadForm.description)
       formData.append('tags', uploadForm.tags)
 
-      const response = await fetch('http://localhost:3000/api/documents/upload', {
+      const response = await fetch('http://localhost:3005/api/documents/upload', {
         method: 'POST',
         body: formData,
       })
@@ -268,7 +285,7 @@ export default function PolicyDocuments() {
     if (!confirm('确定要开始处理这个文档吗？这可能需要一些时间。')) return
 
     try {
-      const response = await fetch(`http://localhost:3000/api/documents/${documentId}/process`, {
+      const response = await fetch(`http://localhost:3005/api/documents/${documentId}/process`, {
         method: 'POST',
       })
 
@@ -291,7 +308,7 @@ export default function PolicyDocuments() {
     if (!confirm('确定要删除这个文档吗？这将同时删除相关的索引数据。')) return
 
     try {
-      const response = await fetch(`http://localhost:3000/api/documents/${documentId}`, {
+      const response = await fetch(`http://localhost:3005/api/documents/${documentId}`, {
         method: 'DELETE',
       })
 
@@ -313,10 +330,24 @@ export default function PolicyDocuments() {
   const handleViewChunks = async (document: PolicyDocument) => {
     setSelectedDocument(document)
     setChunksDialogOpen(true)
+    setSelectedChunks([])  // 先清空，避免显示旧数据
 
-    // 这里可以调用API获取实际的chunks数据
-    // 目前先使用模拟数据
-    setSelectedChunks([])
+    try {
+      const response = await fetch(`http://localhost:3005/api/documents/${document.documentId}/chunks`)
+      const result = await response.json()
+
+      if (result.success && result.data?.chunks) {
+        // 转换数据格式以匹配前端
+        const chunks = result.data.chunks.map((chunk: any, index: number) => ({
+          chunkId: chunk.chunkId || index + 1,
+          page: chunk.metadata?.page_num || chunk.page_num || chunk.metadata?.page || 1,
+          text: chunk.text || chunk.preview || ''
+        }))
+        setSelectedChunks(chunks)
+      }
+    } catch (err) {
+      console.error('获取chunks失败:', err)
+    }
   }
 
   // 替换文档
@@ -332,7 +363,7 @@ export default function PolicyDocuments() {
       const formData = new FormData()
       formData.append('file', uploadForm.file)
 
-      const response = await fetch(`http://localhost:3000/api/documents/${documentId}/replace`, {
+      const response = await fetch(`http://localhost:3005/api/documents/${documentId}/replace`, {
         method: 'POST',
         body: formData,
       })
@@ -370,7 +401,7 @@ export default function PolicyDocuments() {
   const startPolling = (documentId: string) => {
     const interval = setInterval(async () => {
       try {
-        const response = await fetch(`http://localhost:3000/api/documents/${documentId}/status`)
+        const response = await fetch(`http://localhost:3005/api/documents/${documentId}/status`)
         const result = await response.json()
 
         if (result.success) {
@@ -379,7 +410,14 @@ export default function PolicyDocuments() {
           if (status === 'indexed' || status === 'error') {
             clearInterval(interval)
             fetchDocuments()
-            alert(status === 'indexed' ? '文档处理完成！' : '文档处理失败，请查看错误信息')
+
+            if (status === 'indexed') {
+              alert('文档处理完成！')
+            } else if (status === 'error') {
+              // 显示详细错误信息
+              const errorMsg = result.data.error?.message || '文档处理失败，请查看控制台日志'
+              alert(`文档处理失败！\n\n错误原因：${errorMsg}`)
+            }
           }
         }
       } catch (err) {
@@ -604,9 +642,16 @@ export default function PolicyDocuments() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            {getStatusIcon(doc.status)}
-                            <span className="text-sm">{getStatusText(doc.status)}</span>
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2">
+                              {getStatusIcon(doc.status)}
+                              <span className="text-sm">{getStatusText(doc.status)}</span>
+                            </div>
+                            {doc.status === 'error' && doc.error && (
+                              <div className="text-xs text-red-500 max-w-md truncate" title={doc.error.message}>
+                                错误: {doc.error.message}
+                              </div>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -889,10 +934,25 @@ export default function PolicyDocuments() {
                 id="file"
                 type="file"
                 accept=".docx,.doc,.pdf"
-                onChange={(e) => setUploadForm({
-                  ...uploadForm,
-                  file: e.target.files?.[0] || null
-                })}
+                onChange={(e) => {
+                  const file = e.target.files?.[0] || null;
+                  if (file) {
+                    // 自动提取文件名（不含扩展名）作为文档名称
+                    const fileName = file.name;
+                    const lastDot = fileName.lastIndexOf('.');
+                    const baseName = lastDot > 0 ? fileName.substring(0, lastDot) : fileName;
+                    setUploadForm({
+                      ...uploadForm,
+                      file,
+                      name: uploadForm.name || baseName  // 仅在名称为空时自动填充
+                    });
+                  } else {
+                    setUploadForm({
+                      ...uploadForm,
+                      file: null
+                    });
+                  }
+                }}
               />
               <p className="text-xs text-muted-foreground">
                 支持 .docx, .doc, .pdf 格式，最大50MB

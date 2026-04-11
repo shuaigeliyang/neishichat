@@ -117,16 +117,22 @@ def analyze_quality(content):
         print(f"\n⚠️ 发现 {noise_lines} 个噪音行，可能需要进一步清理")
 
 if __name__ == "__main__":
-    # Word文档路径
-    docx_path = r"E:\外包\教育系统智能体\相关文档\2025年本科学生手册-定.docx"
-
-    # 输出路径
-    output_path = r"E:\外包\教育系统智能体\student_handbook_full_clean.json"
-
     print("=" * 60)
     print("🚀 学生手册Word文档提取工具")
     print("设计师：内师智能体系统 (￣▽￣)ﾉ")
     print("=" * 60)
+
+    # 从命令行参数获取路径
+    if len(sys.argv) >= 3:
+        docx_path = sys.argv[1]
+        output_path = sys.argv[2]
+    else:
+        print("用法: python extract_student_handbook_word.py <docx_path> <output_path>")
+        print("示例: python extract_student_handbook_word.py input.docx output.json")
+        sys.exit(1)
+
+    print(f"输入文件: {docx_path}")
+    print(f"输出文件: {output_path}")
 
     # 提取内容
     content = extract_from_word(docx_path, output_path)

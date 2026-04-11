@@ -1,0 +1,21 @@
+{
+  "documentId": "doc_TEMPLATE",
+  "name": "文档模板",
+  "displayName": "文档模板",
+  "description": "新建文档时使用的模板结构",
+  "status": "template",
+  "priority": 0,
+  "tags": [],
+  "sourceFiles": [],
+  "statistics": {
+    "totalPages": 0,
+    "totalChunks": 0,
+    "indexedChunks": 0,
+    "fileSize": 0
+  },
+  "processingHistory": [],
+  "indexedAt": null,
+  "updatedAt": "2026-04-10T11:13:19.662Z",
+  "directory": "documents/doc_TEMPLATE",
+  "isTemplate": true
+}

@@ -163,25 +163,41 @@ def analyze_chunks(chunks: List[Dict]):
 
 def main():
     """主函数"""
-    # 配置路径
-    source_path = r"E:\外包\教育系统智能体\student_handbook_full.json_不完整"
-    output_path = r"E:\外包\教育系统智能体\document_chunks_new.json"
-
     print("=" * 60)
     print("学生手册智能分块工具")
     print("设计师：内师智能体系统 (￣▽￣)ﾉ")
     print("=" * 60)
 
+    # 从命令行参数获取路径
+    if len(sys.argv) >= 3:
+        source_path = sys.argv[1]
+        output_path = sys.argv[2]
+    else:
+        print("用法: python create_chunks_new.py <source_json_path> <output_chunks_path>")
+        print("示例: python create_chunks_new.py content.json chunks.json")
+        sys.exit(1)
+
+    print(f"输入文件: {source_path}")
+    print(f"输出文件: {output_path}")
+
     # 读取源文件
     print(f"\n✓ 正在读取源文件：{source_path}")
-    with open(source_path, 'r', encoding='utf-8') as f:
-        data = json.load(f)
+    try:
+        with open(source_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        print(f"❌ 文件不存在: {source_path}")
+        sys.exit(1)
 
-    total_pages = data["total_pages"]
-    pages = data["pages"]
+    total_pages = data.get("total_pages", 0)
+    pages = data.get("pages", [])
 
     print(f"  - 总页数：{total_pages}")
     print(f"  - 实际页数：{len(pages)}")
+
+    if len(pages) == 0:
+        print("❌ 没有找到页面数据！")
+        sys.exit(1)
 
     # 创建分块
     chunker = SmartChunker(chunk_size=1000, overlap=200)

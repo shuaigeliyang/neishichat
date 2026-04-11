@@ -1,0 +1,87 @@
+{
+  "task_7e828ee3-dd94-4e8c-ba76-5184c5759cc6": {
+    "taskId": "task_7e828ee3-dd94-4e8c-ba76-5184c5759cc6",
+    "status": "failed",
+    "progress": 0,
+    "currentStep": "失败",
+    "totalSteps": 6,
+    "completedSteps": 0,
+    "startTime": "2026-04-11T07:11:53.962Z",
+    "error": "源文件不存在: E:\\外包\\教育系统智能体\\相关文档\\doc_doc_1775891479937_516f193d\\source\\99af7b9a-6cdd-40e2-a314-2d2e04d78606.docx",
+    "endTime": "2026-04-11T07:11:53.967Z"
+  },
+  "task_e1ef0201-e93b-4f50-adba-ab8816337456": {
+    "taskId": "task_e1ef0201-e93b-4f50-adba-ab8816337456",
+    "status": "failed",
+    "progress": 16,
+    "currentStep": "失败",
+    "totalSteps": 6,
+    "completedSteps": 1,
+    "startTime": "2026-04-11T07:14:16.095Z",
+    "error": "ENOENT: no such file or directory, open 'E:\\外包\\教育系统智能体\\相关文档\\doc_doc_1775891479937_516f193d\\extracted\\content.json'",
+    "endTime": "2026-04-11T07:14:17.686Z"
+  },
+  "task_e5fffc59-07cd-48b3-a835-b0426a688e9a": {
+    "taskId": "task_e5fffc59-07cd-48b3-a835-b0426a688e9a",
+    "status": "failed",
+    "progress": 16,
+    "currentStep": "失败",
+    "totalSteps": 6,
+    "completedSteps": 1,
+    "startTime": "2026-04-11T07:14:38.890Z",
+    "error": "ENOENT: no such file or directory, open 'E:\\外包\\教育系统智能体\\相关文档\\doc_doc_1775891479937_516f193d\\extracted\\content.json'",
+    "endTime": "2026-04-11T07:14:40.268Z"
+  },
+  "task_45f46d12-7618-4acd-b2c6-39ef125e6f32": {
+    "taskId": "task_45f46d12-7618-4acd-b2c6-39ef125e6f32",
+    "status": "failed",
+    "progress": 83,
+    "currentStep": "失败",
+    "totalSteps": 6,
+    "completedSteps": 5,
+    "startTime": "2026-04-11T07:23:50.851Z",
+    "error": "this.apiKeyManager.getAvailableApiKey is not a function",
+    "endTime": "2026-04-11T07:23:51.187Z"
+  },
+  "task_fb39024c-1202-4538-95a9-84ad20b7708c": {
+    "taskId": "task_fb39024c-1202-4538-95a9-84ad20b7708c",
+    "status": "completed",
+    "progress": 100,
+    "currentStep": "完成",
+    "totalSteps": 6,
+    "completedSteps": 6,
+    "startTime": "2026-04-11T07:28:39.643Z",
+    "error": null,
+    "endTime": "2026-04-11T07:28:45.343Z",
+    "result": {
+      "pages": 264,
+      "chunks": 16
+    }
+  },
+  "task_4e06ad08-ee16-4161-8c5f-f906e13d5848": {
+    "taskId": "task_4e06ad08-ee16-4161-8c5f-f906e13d5848",
+    "status": "failed",
+    "progress": 100,
+    "currentStep": "失败",
+    "totalSteps": 6,
+    "completedSteps": 6,
+    "startTime": "2026-04-11T07:33:51.715Z",
+    "error": "Cannot read properties of undefined (reading 'find')",
+    "endTime": "2026-04-11T07:33:56.456Z"
+  },
+  "task_ba22a56d-de43-49b7-a09b-250c56003718": {
+    "taskId": "task_ba22a56d-de43-49b7-a09b-250c56003718",
+    "status": "completed",
+    "progress": 100,
+    "currentStep": "完成",
+    "totalSteps": 6,
+    "completedSteps": 6,
+    "startTime": "2026-04-11T07:35:15.992Z",
+    "error": null,
+    "endTime": "2026-04-11T07:35:20.461Z",
+    "result": {
+      "pages": 264,
+      "chunks": 16
+    }
+  }
+}

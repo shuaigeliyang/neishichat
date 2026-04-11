@@ -46,8 +46,11 @@ class DocumentPipeline {
 
     /**
      * 处理新文档（完整流程）
+     * @param {string} documentId - 文档ID
+     * @param {string} docName - 文档名称（用于创建目录）
+     * @param {string} sourceFileName - 实际的源文件名（从注册表获取）
      */
-    async processDocument(documentId, docName) {
+    async processDocument(documentId, docName, sourceFileName) {
         console.log(`\n========== 开始处理文档: ${docName} ==========`);
 
         try {
@@ -57,17 +60,27 @@ class DocumentPipeline {
             // 2. 定义路径（使用相对路径）
             const sourceDir = path.join(this.basePath, '相关文档');
             const targetDir = path.join(this.basePath, '文档提取', docName);
-            const sourceFile = path.join(sourceDir, `${docName}.docx`);
 
-            // 3. 确保目标目录存在
+            // 3. 使用实际的源文件名（从注册表获取）
+            const sourceFile = path.join(sourceDir, sourceFileName);
+            console.log(`  源文件: ${sourceFile}`);
+
+            // 检查源文件是否存在
+            try {
+                await fs.access(sourceFile);
+            } catch (err) {
+                throw new Error(`源文件不存在: ${sourceFile}`);
+            }
+
+            // 4. 确保目标目录存在
             await fs.mkdir(targetDir, { recursive: true });
 
-            // 4. 复制文件到文档提取目录
-            const targetFile = path.join(targetDir, `${docName}.docx`);
+            // 5. 复制文件到文档提取目录（使用原始文件名）
+            const targetFile = path.join(targetDir, sourceFileName);
             await fs.copyFile(sourceFile, targetFile);
             console.log(`✓ 文件已复制到: ${targetFile}`);
 
-            // 5. 提取文档内容
+            // 6. 提取文档内容
             console.log('\n--- 步骤1: 提取文档内容 ---');
             await this.extractDocument(targetFile, targetDir);
 
@@ -128,7 +141,8 @@ class DocumentPipeline {
 
         } catch (error) {
             console.error(`✗ 文档处理失败: ${error.message}`);
-            await this.registry.updateDocumentStatus(documentId, 'error');
+            console.error(`  错误堆栈: ${error.stack}`);
+            await this.registry.updateDocumentStatus(documentId, 'error', {}, error);
             throw error;
         }
     }

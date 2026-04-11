@@ -25,15 +25,14 @@ class RAGService {
         this.initialized = false;
 
         // 配置选项
-        // ✨ 使用文档提取目录
+        // ✨ 使用根目录的统一索引
         const basePath = path.resolve(__dirname, '../..');
-        const handbookPath = path.join(basePath, '文档提取', '2025年本科学生手册-定');
 
         this.options = {
-            chunksPath: options.chunksPath || path.join(handbookPath, 'student_handbook_full.json'),
-            indexPath: options.indexPath || path.join(handbookPath, 'retrieval_index.json'),
-            cachePath: options.cachePath || path.join(handbookPath, 'embedding_cache.json'),
-            handbookPath: handbookPath, // 文档提取目录路径
+            chunksPath: options.chunksPath || path.join(basePath, '文档提取', '2025年本科学生手册-定', 'student_handbook_full.json'),
+            indexPath: options.indexPath || path.join(basePath, 'retrieval_index.json'),  // 根目录的统一索引
+            cachePath: options.cachePath || path.join(basePath, 'embedding_cache.json'),  // 根目录的缓存
+            handbookPath: basePath,  // 根目录路径
             topK: options.topK || 5,
             minScore: options.minScore || 0.5,
             ...options

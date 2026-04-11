@@ -75,6 +75,7 @@ app.use('/api/intelligent', require('./routes/intelligent')); // 智能查询路
 app.use('/api/rag', require('./routes/rag')); // RAG文档问答路由（单文档版本）
 app.use('/api/rag-v2', require('./routes/ragV2')); // RAG文档问答路由（多文档版本 ✨新增）
 app.use('/api/handbook', require('./routes/handbook')); // 学生手册查询路由（新增！）
+app.use('/api/index', require('./routes/index')); // 统一索引管理路由（新增！）
 app.use('/api/documents', require('./routes/documents')); // 文档管理路由（多政策系统新增！）
 
 // 404处理

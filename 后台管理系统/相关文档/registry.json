@@ -1,0 +1,13 @@
+{
+  "version": "1.0",
+  "createdAt": "2026-04-11T06:18:40.880Z",
+  "updatedAt": "2026-04-11T06:18:40.882Z",
+  "config": {
+    "indexName": "retrieval_index",
+    "embeddingModel": "embedding-3",
+    "chunkStrategy": "intelligent",
+    "chunkSize": 1000,
+    "chunkOverlap": 200
+  },
+  "documents": []
+}

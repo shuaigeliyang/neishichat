@@ -1,0 +1,11 @@
+{
+  "version": "2.0",
+  "createdAt": "2026-04-11T04:49:33.359Z",
+  "updatedAt": "2026-04-11T06:11:13.147Z",
+  "config": {
+    "indexName": "unified_policy_index",
+    "embeddingModel": "embedding-3",
+    "rerankModel": "rerank"
+  },
+  "documents": []
+}
