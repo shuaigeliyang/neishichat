@@ -25,16 +25,21 @@ class RAGService {
         this.initialized = false;
 
         // 配置选项
-        // ✨ 使用根目录的统一索引
-        const basePath = path.resolve(__dirname, '../..');
+        // 前台 basePath = E:/外包/教育系统智能体/backend/
+        // 统一索引在 E:/外包/教育系统智能体/文档库/indexes/
+        const basePath = path.resolve(__dirname, '../..');  // E:/外包/教育系统智能体
+        const projectRoot = basePath;  // 直接用 basePath
 
         this.options = {
-            chunksPath: options.chunksPath || path.join(basePath, '文档提取', '2025年本科学生手册-定', 'student_handbook_full.json'),
-            indexPath: options.indexPath || path.join(basePath, 'retrieval_index.json'),  // 根目录的统一索引
-            cachePath: options.cachePath || path.join(basePath, 'embedding_cache.json'),  // 根目录的缓存
-            handbookPath: basePath,  // 根目录路径
+            // 统一索引位置（通过 getAvailableIndexPath 动态获取）
+            indexPath: options.indexPath || path.join(projectRoot, '文档库', 'indexes', 'retrieval_index.json'),
+            // 向量缓存
+            cachePath: options.cachePath || path.join(projectRoot, '文档库', 'indexes', 'embedding_cache.json'),
+            // 不再使用旧 chunksPath（旧的学生手册文件）
+            chunksPath: options.chunksPath || path.join(projectRoot, '文档提取', '2025年本科学生手册-定', 'student_handbook_full.json'),
+            handbookPath: projectRoot,
             topK: options.topK || 5,
-            minScore: options.minScore || 0.5,
+            minScore: options.minScore || 0.2,  // 从0.5降到0.2，避免过滤掉相关文档
             ...options
         };
     }
@@ -42,22 +47,25 @@ class RAGService {
     /**
      * ✨ 获取实际可用的索引路径
      * 优先从统一索引位置读取（Single Source of Truth）
+     *
+     * 前台后端 basePath = E:/外包/教育系统智能体/backend/
+     * 统一索引实际位置 = E:/外包/教育系统智能体/文档库/indexes/retrieval_index.json
      */
     async getAvailableIndexPath() {
+        // basePath = E:/外包/教育系统智能体（前台 backend 目录往上级）
         const basePath = path.resolve(__dirname, '../..');
-
-        // 优先：统一索引位置
         const unifiedIndexPath = path.join(basePath, '文档库', 'indexes', 'retrieval_index.json');
+
         try {
             await fs.access(unifiedIndexPath);
             console.log(`✓ 发现统一索引: ${unifiedIndexPath}`);
             return unifiedIndexPath;
-        } catch { /* 未找到，继续尝试 */ }
+        } catch { /* 未找到 */ }
 
         // 回退：根目录旧索引（兼容旧数据）
         try {
             await fs.access(this.options.indexPath);
-            console.log(`⚠️ 使用旧索引（请迁移到统一索引）: ${this.options.indexPath}`);
+            console.log(`⚠️ 使用旧索引: ${this.options.indexPath}`);
             return this.options.indexPath;
         } catch {
             console.log('⚠️ 未找到索引文件');

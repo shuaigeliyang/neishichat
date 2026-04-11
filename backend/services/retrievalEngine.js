@@ -92,7 +92,7 @@ class RetrievalEngine {
     async retrieve(question, options = {}) {
         const {
             topK = 5,
-            minScore = 0.5,
+            minScore = 0.2,  // 从0.5降到0.2，避免过滤掉相关文档
             useReranking = true
         } = options;
 
