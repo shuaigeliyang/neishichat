@@ -10,6 +10,7 @@ import collegeRoutes from './colleges.js'
 import majorRoutes from './majors.js'
 import classRoutes from './classes.js'
 import documentRegistryRoutes from './documentRegistry.js'
+import unifiedRagRoutes from './unifiedRag.js'
 
 const router = Router()
 
@@ -19,7 +20,8 @@ router.use('/teachers', teacherRoutes)
 router.use('/courses', courseRoutes)
 router.use('/knowledge', knowledgeRoutes)
 router.use('/knowledge-management', knowledgeManagementRoutes)
-router.use('/documents', documentRegistryRoutes) // 新增：文档管理API
+router.use('/documents', documentRegistryRoutes) // 文档管理API
+router.use('/rag', unifiedRagRoutes) // 新增：统一RAG问答API
 router.use('/settings', settingsRoutes)
 router.use('/colleges', collegeRoutes)
 router.use('/majors', majorRoutes)

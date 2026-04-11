@@ -14,6 +14,7 @@ import axios from 'axios';
 import DocumentRegistry from './documentRegistry.js';
 import IndexManager from './indexManager.js';
 import ApiKeyManager from './apiKeyManager.js';
+import eventBus from './eventBus.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -268,6 +269,9 @@ class IncrementalPipeline {
             console.log(`   - 分块: ${chunksWithEmbeddings.length}`);
             console.log(`   - 索引: ${this.indexManager.getIndexFilePath()}`);
 
+            // 📢 发布文档索引事件 - RAG服务会自动感知并重新加载索引
+            eventBus.notifyIndexed(documentId, document, chunksWithEmbeddings);
+
             return {
                 success: true,
                 documentId,
@@ -365,10 +369,16 @@ class IncrementalPipeline {
      * 删除文档（从注册表和索引中移除，保留源文件）
      */
     async deleteDocument(documentId) {
+        // 获取文档信息用于事件
+        const docInfo = await this.registry.getDocument(documentId);
+
         // 1. 从索引中移除
         try {
             await this.indexManager.removeDocumentFromIndex(documentId);
             console.log(`✓ 文档已从索引删除: ${documentId}`);
+
+            // 📢 发布文档删除事件 - RAG服务会自动感知
+            eventBus.notifyDeleted(documentId);
         } catch (error) {
             console.log(`⚠️ 文档不在索引中: ${documentId}`);
         }
