@@ -43,6 +43,8 @@ function Chat({ user }) {
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
   const [handbookModalVisible, setHandbookModalVisible] = useState(false);
   const [selectedPageNum, setSelectedPageNum] = useState(null);
+  const [selectedSourceContent, setSelectedSourceContent] = useState(null);  // 预加载的来源内容
+  const [selectedDocumentName, setSelectedDocumentName] = useState(null);  // 当前文档名称
   const [sourcesPageMap, setSourcesPageMap] = useState({});
   const SOURCES_PER_PAGE = 5;
   const [multiline, setMultiline] = useState(false);
@@ -140,7 +142,7 @@ function Chat({ user }) {
   // ✨ 新增：获取可用的文档列表
   const fetchAvailableDocuments = async () => {
     try {
-      const response = await axios.get('/api/rag/documents', {
+      const response = await axios.get('/api/rag-v2/documents', {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
 
@@ -624,10 +626,11 @@ function Chat({ user }) {
           if (docGroup.chunks && docGroup.chunks.length > 0) {
             docGroup.chunks.forEach(chunk => {
               formattedSources.push({
-                chapter: chunk.chapter,
                 page: chunk.page,
                 score: chunk.score,
-                documentName: docGroup.documentName  // ✨ 新增：文档名称
+                text: chunk.text,      // 完整文本，用于点击查看
+                preview: chunk.preview,  // 预览文本，用于列表显示
+                documentName: docGroup.documentName
               });
             });
           }
@@ -1110,6 +1113,11 @@ function Chat({ user }) {
                         </div>
                       ) : msg.isRAGAnswer ? (
                         <div className="rag-result">
+                          {msg.confidence && (
+                            <div style={{ fontSize: '12px', color: '#999', marginBottom: '8px' }}>
+                              📊 检索置信度: {(msg.confidence * 100).toFixed(1)}%
+                            </div>
+                          )}
                           <Markdown>{msg.content}</Markdown>
 
                           {msg.sources && msg.sources.length > 0 && (
@@ -1119,6 +1127,11 @@ function Chat({ user }) {
                                 <BookOutlined style={{ color: '#1890ff' }} />
                                 <span>📖 参考来源：</span>
                                 <span className="sources-count">共 {msg.sources.length} 条</span>
+                                {msg.confidence && (
+                                  <span style={{ color: msg.confidence >= 0.5 ? '#52c41a' : '#faad14', marginLeft: '8px' }}>
+                                    ({msg.confidence >= 0.5 ? '✅ 高置信度' : '⚠️ 低置信度'})
+                                  </span>
+                                )}
                               </div>
 
                               {(() => {
@@ -1135,15 +1148,23 @@ function Chat({ user }) {
                                         key={idx}
                                         onClick={() => {
                                           setSelectedPageNum(source.page);
+                                          setSelectedSourceContent(source.text);  // 完整文本
+                                          setSelectedDocumentName(source.documentName);
                                           setHandbookModalVisible(true);
                                         }}
                                         className="source-item"
                                       >
-                                        <BookOutlined />
-                                        <span className="source-text">
-                                          {source.documentName || '未知文档'} - {source.chapter || '未知章节'}（第{source.page}页）
-                                        </span>
-                                        <span className="source-action">点击查看 →</span>
+                                        <div className="source-header">
+                                          <BookOutlined />
+                                          <span className="source-title">
+                                            {source.documentName || '未知文档'}
+                                          </span>
+                                          <span className="source-page">第{source.page}页</span>
+                                        </div>
+                                        <div className="source-preview">
+                                          {source.preview || source.text?.substring(0, 200)}
+                                        </div>
+                                        <span className="source-action">点击查看完整内容 →</span>
                                       </div>
                                     ))}
 
@@ -1299,8 +1320,14 @@ function Chat({ user }) {
       {/* 学生手册查看器 */}
       <HandbookViewer
         visible={handbookModalVisible}
-        onClose={() => setHandbookModalVisible(false)}
+        onClose={() => {
+          setHandbookModalVisible(false);
+          setSelectedSourceContent(null);
+          setSelectedDocumentName(null);
+        }}
         pageNum={selectedPageNum}
+        preloadContent={selectedSourceContent}
+        documentName={selectedDocumentName}
       />
     </div>
   );

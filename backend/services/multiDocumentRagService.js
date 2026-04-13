@@ -1,173 +1,597 @@
 /**
- * 多文档RAG服务
+ * 多文档RAG服务 - 全新重构版
+ * 参考Coze多知识库设计
  * 设计师：哈雷酱 (￣▽￣)／
- * 功能：支持多政策文档的RAG问答
  *
- * 核心改进：
- * - 从统一索引读取数据
- * - 支持多文档来源追踪
- * - 自动聚合所有已索引政策
- * - 标注答案来源文档
+ * 核心设计：
+ * 1. 自包含索引：chunks自带embedding，无需外部缓存
+ * 2. 按文档分组：支持文档级过滤检索
+ * 3. 混合搜索：向量检索 + BM25关键词检索融合
+ * 4. 严格基于检索内容回答，禁止编造
  */
 
-const RetrievalEngine = require('./retrievalEngine');
-const QAGenerator = require('./qaGenerator');
-const UnifiedIndexManager = require('./unifiedIndexManager');
+const axios = require('axios');
 const fs = require('fs').promises;
 const path = require('path');
+const HybridSearch = require('./hybridSearch');
+const PythonEmbeddingClient = require('../pythonEmbeddingClient');
 
 class MultiDocumentRAGService {
     constructor(apiKey, options = {}) {
-        this.apiKey = apiKey;
-        this.embeddingMode = options.embeddingMode || process.env.EMBEDDING_MODE || 'api';
+        // apiKey参数保留（向后兼容），但不再使用
+        this.options = {
+            // 索引文件路径（自包含embedding）
+            indexPath: options.indexPath || path.join(__dirname, '../../文档库/indexes/unified_index.json'),
+            // Anthropic API配置（Minimaxi兼容接口）
+            chatUrl: process.env.ANTHROPIC_BASE_URL || 'https://api.minimaxi.com/anthropic',
+            chatModel: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514',
+            chatApiKey: process.env.ANTHROPIC_API_KEY,
+            // 检索配置
+            defaultTopK: 5,
+            defaultMinScore: 0.3,
+        };
 
-        // 使用统一索引管理器
-        this.indexManager = new UnifiedIndexManager(apiKey, {
-            embeddingMode: this.embeddingMode
+        // 索引数据（内存）
+        this.indexData = null;
+        this.initialized = false;
+        this.lastIndexMtime = null;  // ✨ 记录上次加载索引的时间戳，用于检测更新
+
+        // 混合搜索器
+        this.hybridSearch = new HybridSearch({
+            vectorWeight: 0.6,  // 向量权重60%
+            bm25Weight: 0.4    // BM25权重40%
         });
 
-        this.qaGenerator = new QAGenerator(apiKey, options.model || 'glm-4-flash');
-        this.initialized = false;
+        // 本地Python Embedding客户端（本小姐的终极武器！）
+        this.pythonEmbeddingClient = new PythonEmbeddingClient();
+
+        // 请求队列控制（本小姐的优化！）
+        this.chatRequestQueue = [];
+        this.isProcessingChat = false;
+        this.chatRequestInterval = 1000;  // 每1秒最多1个chat请求
+        this.maxChatRetries = 3;
+
+        // 答案缓存（避免重复调用API）
+        this.answerCache = new Map();
+        this.cacheMaxAge = 300000;  // 缓存5分钟
+        this.startCacheCleanup();
     }
 
     /**
-     * 初始化服务
+     * 初始化 - 加载索引到内存
      */
     async initialize() {
-        console.log('✓ 初始化多文档RAG服务...\n');
+        if (this.initialized) return;
 
-        try {
-            // 1. 初始化统一索引管理器
-            await this.indexManager.initialize();
-
-            // 2. 加载embedding缓存
-            const basePath = path.resolve(__dirname, '../..');
-            const cachePath = path.join(basePath, '文档库', 'indexes', 'embedding_cache.json');
-            await this.indexManager.embeddingService.loadCache(cachePath);
-
-            this.initialized = true;
-
-            // 显示统计信息
-            const stats = this.indexManager.getStatistics();
-            console.log('\n✓ 多文档RAG服务初始化完成！');
-            console.log('  - 已索引文档数：', stats.totalDocuments);
-            console.log('  - 总chunks数：', stats.totalChunks);
-            console.log('  - 已索引文档：');
-            stats.documents.forEach(doc => {
-                console.log(`    • ${doc.name}`);
-            });
-            console.log();
-
-        } catch (error) {
-            console.error('✗ 初始化失败：', error.message);
-            throw error;
-        }
+        console.log('📂 加载统一索引...');
+        await this.loadIndex();
+        this.initialized = true;
+        console.log('✓ 多文档RAG服务初始化完成\n');
     }
 
     /**
-     * 智能问答（支持多文档）
+     * 加载索引（支持热更新）
      */
-    async ask(question, options = {}) {
-        if (!this.initialized) {
-            await this.initialize();
-        }
-
-        const {
-            topK = 5,
-            minScore = 0.5,
-            useReranking = true
-        } = options;
-
+    async loadIndex() {
         try {
-            console.log(`\n========== 问题：${question} ==========`);
+            const data = await fs.readFile(this.options.indexPath, 'utf-8');
+            this.indexData = JSON.parse(data);
 
-            // 1. 为问题生成向量
-            const questionEmbedding = await this.indexManager.embeddingService.generateEmbedding(question);
+            // 确保结构完整
+            if (!this.indexData.documents) this.indexData.documents = [];
+            if (!this.indexData.chunks) this.indexData.chunks = [];
 
-            // 2. 在统一索引中检索
-            const results = await this.indexManager.search(questionEmbedding, {
-                topK: topK,
-                minScore: minScore
-            });
+            // 统计有embedding的chunks
+            const chunksWithEmbedding = this.indexData.chunks.filter(c => c.embedding).length;
 
-            if (results.length === 0) {
-                console.log('⚠️ 未找到相关内容');
-                return {
-                    answer: '抱歉，我在已索引的政策文档中没有找到与您问题相关的内容。',
-                    sources: []
-                };
+            console.log(`✓ 索引加载成功`);
+            console.log(`  - 文档数: ${this.indexData.documents.length}`);
+            console.log(`  - 总chunks: ${this.indexData.chunks.length}`);
+            console.log(`  - 有embedding的chunks: ${chunksWithEmbedding}`);
+
+            // 显示每个文档的统计
+            for (const doc of this.indexData.documents) {
+                const docChunks = this.indexData.chunks.filter(c => c.documentId === doc.documentId);
+                const docWithEmb = docChunks.filter(c => c.embedding).length;
+                console.log(`    📄 ${doc.displayName || doc.name}: ${docWithEmb}/${docChunks.length} chunks`);
             }
 
-            // 3. 按文档分组结果
-            const groupedResults = this.indexManager.groupChunksByDocument(results);
-
-            console.log(`\n✓ 检索到 ${results.length} 个相关chunks`);
-            console.log(`  来源文档：${groupedResults.length} 个`);
-
-            // 4. 生成答案
-            const context = results.map(r => r.text).join('\n\n');
-            const answer = await this.qaGenerator.generateAnswer(question, context);
-
-            // 5. 格式化来源信息
-            const sources = this.formatSources(groupedResults);
-
-            console.log(`\n========== 回答生成完成 ==========\n`);
-
-            return {
-                answer: answer,
-                sources: sources,
-                retrievedChunks: results.length
-            };
-
         } catch (error) {
-            console.error('✗ 问答失败：', error.message);
+            console.error('✗ 索引加载失败:', error.message);
             throw error;
         }
     }
 
     /**
-     * 格式化来源信息
+     * 检查索引文件是否更新（通过时间戳）
+     * ✨ 修复：后台系统更新索引后，前台系统能感知到变化
      */
-    formatSources(groupedResults) {
-        return groupedResults.map(group => ({
-            documentId: group.documentId,
-            documentName: group.documentName,
-            chunks: group.chunks.map(chunk => ({
-                chapter: chunk.chapter,
-                page: chunk.page,
-                score: chunk.score,
-                preview: chunk.text.substring(0, 100) + '...'
-            }))
-        }));
+    async checkIndexUpdate() {
+        try {
+            const stats = await fs.stat(this.options.indexPath);
+            const fileMtime = stats.mtime.getTime();
+
+            // 如果文件更新时间比记录的更新时间更新，则重新加载
+            if (this.lastIndexMtime && fileMtime > this.lastIndexMtime) {
+                console.log(`🔄 检测到索引文件已更新，重新加载...`);
+                await this.loadIndex();
+            }
+
+            // 更新记录的时间戳
+            this.lastIndexMtime = fileMtime;
+        } catch (error) {
+            // 忽略错误，不影响正常查询
+        }
     }
 
     /**
-     * 获取统计信息
+     * 生成问题向量（使用本地Python服务）
      */
-    getStatistics() {
-        if (!this.initialized) {
-            return null;
+    async generateEmbedding(text) {
+        // 使用本地Python embedding服务（完全免费，无限流！）
+        return await this.pythonEmbeddingClient.getEmbedding(text);
+    }
+
+    /**
+     * 计算余弦相似度
+     */
+    cosineSimilarity(vecA, vecB) {
+        if (!vecA || !vecB || vecA.length !== vecB.length) return 0;
+        let dot = 0, normA = 0, normB = 0;
+        for (let i = 0; i < vecA.length; i++) {
+            dot += vecA[i] * vecB[i];
+            normA += vecA[i] * vecA[i];
+            normB += vecB[i] * vecB[i];
+        }
+        return normA && normB ? dot / (Math.sqrt(normA) * Math.sqrt(normB)) : 0;
+    }
+
+    /**
+     * 检索相关chunks - 混合搜索（向量 + BM25）
+     */
+    async search(queryEmbedding, options = {}) {
+        const { topK = 5, minScore = 0.2, documentIds = null } = options;
+
+        // 1. 按文档过滤（如果有指定）
+        let chunks = this.indexData.chunks;
+        if (documentIds && documentIds.length > 0) {
+            chunks = chunks.filter(c => documentIds.includes(c.documentId));
+            console.log(`🎯 文档过滤: ${documentIds.length}个文档, ${chunks.length}个chunks`);
         }
 
-        const indexStats = this.indexManager.getStatistics();
+        const query = options.question || '';
+
+        // 2. 向量检索（使用余弦相似度）
+        console.log('🔍 向量检索...');
+        const vectorResults = chunks
+            .filter(c => c.embedding)
+            .map(c => ({ ...c, score: this.cosineSimilarity(queryEmbedding, c.embedding) }))
+            .filter(r => r.score >= 0.1)  // 先低阈值，后面融合会过滤
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 30);  // 取前30个，后面融合
+
+        console.log(`   向量检索: ${vectorResults.length} 个候选`);
+
+        // 3. BM25关键词检索
+        console.log('🔍 BM25检索...');
+        this.hybridSearch.preprocess(chunks);
+        const bm25Results = this.hybridSearch.searchBM25(query, chunks, 30);
+
+        console.log(`   BM25检索: ${bm25Results.length} 个候选`);
+
+        // 4. 融合两种检索结果
+        console.log('🔄 混合融合...');
+        const fusedResults = this.hybridSearch.weightedFusion(
+            vectorResults,
+            bm25Results,
+            0.6  // 向量权重60%
+        );
+
+        // 5. 过滤并返回TopK
+        const results = fusedResults
+            .filter(r => r.fusedScore >= minScore)
+            .slice(0, topK);
+
+        console.log(`✓ 混合检索到 ${results.length} 个相关chunks`);
+
+        // 打印详细分数
+        if (results.length > 0) {
+            console.log('   分数详情（向量/BM25/融合）:');
+            results.slice(0, 3).forEach((r, i) => {
+                console.log(`   [${i + 1}] ${r.documentName} p${r.page_num}: ${r.vectorScoreNorm?.toFixed(2) || '?'}/${r.bm25ScoreNorm?.toFixed(2) || '?'}/${r.fusedScore?.toFixed(2) || '?'}`);
+            });
+        }
+
+        return results;
+    }
+
+    /**
+     * Chat请求队列处理（本小姐的优雅解决方案！）
+     */
+    async enqueueChatRequest(requestFn) {
+        return new Promise((resolve, reject) => {
+            this.chatRequestQueue.push({
+                fn: requestFn,
+                resolve,
+                reject,
+                retries: 0
+            });
+
+            if (!this.isProcessingChat) {
+                this.processChatQueue();
+            }
+        });
+    }
+
+    async processChatQueue() {
+        if (this.chatRequestQueue.length === 0) {
+            this.isProcessingChat = false;
+            return;
+        }
+
+        this.isProcessingChat = true;
+        const task = this.chatRequestQueue.shift();
+
+        try {
+            const result = await task.fn();
+            task.resolve(result);
+        } catch (error) {
+            // 如果是429限流错误，重试
+            if (error.response?.status === 429 && task.retries < this.maxChatRetries) {
+                task.retries++;
+                console.log(`⚠️ Chat API遇到限流，重试第${task.retries}次...`);
+
+                // 指数退避
+                const backoffTime = Math.pow(2, task.retries) * 1000;
+                await this.sleep(backoffTime);
+
+                // 重新加入队列
+                this.chatRequestQueue.unshift(task);
+            } else {
+                task.reject(error);
+            }
+        }
+
+        // 处理下一个请求，添加间隔避免限流
+        setTimeout(() => this.processChatQueue(), this.chatRequestInterval);
+    }
+
+    /**
+     * 延时函数
+     */
+    sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    /**
+     * 生成答案
+     * ✨ 严格基于检索到的文档内容回答，不允许编造
+     */
+    async generateAnswer(question, context) {
+        // 检查缓存（本小姐的优化！）
+        const cacheKey = this.hashText(question + context.substring(0, 200));
+        const cached = this.answerCache.get(cacheKey);
+        if (cached && Date.now() - cached.timestamp < this.cacheMaxAge) {
+            console.log('✓ 使用缓存的答案');
+            return cached.answer;
+        }
+
+        // 使用队列包装请求（避免并发触发限流！）
+        return this.enqueueChatRequest(async () => {
+            const systemPrompt = `你是教育系统的智能助手。
+
+【关键概念区分 - 必须理解】
+1. "免修"：因身体原因不能参加课程，申请免除学习（需要医院证明）
+2. "补考"：课程考核不合格后的再次考试机会
+3. "重修"：补考不合格后需要重新学习课程
+4. 这三个是完全不同的概念，严禁混淆！
+
+【严格的页码和内容匹配规则】
+1. 每个文档片段都有明确的"页码：第X页"和内容主题
+2. 第21页的主题是"课程免修、缓考"，包含"计算机等级证书认定学分"
+3. 第25页的主题是"考勤纪律、考试纪律、旷课处分"
+4. 第59页的主题是"重修流程、结业处理"
+5. 严禁将第21页的"免修"内容说成是"补考重修"
+
+【绝对禁止的幻觉】
+1. 禁止编造不存在的"第十二条"关于补考的规定
+2. 禁止说"第25页第十二条"（实际不存在）
+3. 禁止将第21页的"免修"内容误称为"补考规定"
+4. 禁止将"计算机等级证书认定"说成是"补考合格后的处理"
+
+【必须遵守的规则】
+1. 只能使用文档片段中明确标注的页码
+2. 如果文档片段是第21页，就必须说"第21页"
+3. 严禁编造、猜测或混淆页码
+4. 严禁将文档A的内容错误地归因为文档B
+5. 如果文档片段中没有补考相关内容，明确说明"根据提供的文档，没有找到相关内容"
+
+【文档片段】
+${context}
+
+【用户问题】
+${question}
+
+【回答要求】
+- 严格区分"免修"、"补考"、"重修"的概念
+- 只使用文档片段中明确标注的页码
+- 如果文档片段中没有相关信息，明确说明
+- 不要编造任何文档片段中没有的内容
+`;
+
+            const response = await axios.post(
+                `${this.options.chatUrl}/v1/messages`,
+                {
+                    model: this.options.chatModel,
+                    max_tokens: 4096,
+                    system: systemPrompt,
+                    messages: [
+                        { role: 'user', content: question }
+                    ],
+                    temperature: 0.7
+                },
+                {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': this.options.chatApiKey,
+                        'anthropic-version': '2023-06-01'
+                    },
+                    timeout: 60000
+                }
+            );
+
+            // 提取answer（content可能是数组，需要找到text类型的内容）
+            let answer = '';
+            const content = response.data.content;
+            if (Array.isArray(content)) {
+                const textContent = content.find(c => c.type === 'text');
+                answer = textContent ? textContent.text : (content[0]?.text || content[0]?.thinking || '');
+            } else {
+                answer = content?.text || content?.content || content || '';
+            }
+
+            // 缓存答案
+            this.answerCache.set(cacheKey, {
+                answer,
+                timestamp: Date.now()
+            });
+
+            return answer;
+        });
+    }
+
+    /**
+     * 智能问答
+     * ✨ 修复：每次查询前检查索引文件是否更新
+     */
+    async ask(question, options = {}) {
+        if (!this.initialized) await this.initialize();
+
+        // ✨ 检查索引文件是否更新（通过时间戳）
+        await this.checkIndexUpdate();
+
+        const { topK = 5, minScore = 0.2, documentIds = null } = options;
+
+        console.log(`\n========== 问题：${question} ==========`);
+
+        // 1. 生成问题向量
+        console.log('🔄 生成问题向量...');
+        const questionEmbedding = await this.generateEmbedding(question);
+
+        // 2. 混合检索（向量 + BM25）
+        const results = await this.search(questionEmbedding, { topK, minScore, documentIds, question });
+
+        if (results.length === 0) {
+            console.log('⚠️ 未检索到任何相关文档');
+            return {
+                answer: '抱歉，没有找到与您问题相关的内容。',
+                sources: [],
+                retrievedChunks: 0,
+                confidence: 0
+            };
+        }
+
+        // ✨ 3. 检查置信度 - 使用融合分数
+        const highestScore = results[0]?.fusedScore || results[0]?.score || 0;
+        console.log(`📊 最高融合分数: ${highestScore.toFixed(4)}`);
+
+        // 打印检索到的chunks内容（前3个）
+        console.log('📄 检索到的内容（前3个）：');
+        results.slice(0, 3).forEach((r, i) => {
+            console.log(`  [${i + 1}] ${r.documentName} (第${r.page_num || r.page || '?'}页) 融合分:${(r.fusedScore || r.score).toFixed(3)}`);
+            console.log(`      内容: ${(r.text || r.full_context || '').substring(0, 100)}...`);
+        });
+
+        // ✨ 新增：直接答案模式（避免LLM幻觉）
+        const useDirectAnswer = options.useDirectAnswer !== false;  // 默认使用直接答案
+
+        // 4. 按文档分组（必须在直接答案模式之前定义）
+        const grouped = {};
+        for (const r of results) {
+            if (!grouped[r.documentId]) {
+                grouped[r.documentId] = { documentId: r.documentId, documentName: r.documentName, chunks: [] };
+            }
+            // 修复：使用 page_num 而不是 page，使用融合分数
+            // ✨ 修复：返回完整text而不是截断的preview
+            const fullText = r.text || r.full_context || '';
+            grouped[r.documentId].chunks.push({
+                chapter: r.chapter || r.chapter_title || '未知章节',
+                page: r.page_num || r.page || 0,
+                score: r.fusedScore || r.score,
+                vectorScore: r.vectorScore,
+                bm25Score: r.bm25Score,
+                text: fullText,  // ✨ 返回完整文本
+                preview: fullText.substring(0, 150)  // 仅用于列表预览
+            });
+        }
+
+        // ✨ 提高置信度阈值，只返回高质量结果
+        const confidenceThreshold = 0.5;  // 从0.25提高到0.5
+        if (highestScore < confidenceThreshold) {
+            console.log(`⚠️ 置信度不足（${highestScore.toFixed(3)} < ${confidenceThreshold}），拒绝生成答案`);
+            return {
+                answer: '抱歉，根据已索引的文档，没有找到与您问题相关的内容。',
+                sources: [],
+                retrievedChunks: results.length,
+                confidence: highestScore
+            };
+        }
+
+        // ✨ 直接答案模式：返回格式化的检索结果，不经过LLM
+        if (useDirectAnswer && highestScore > 0.4) {
+            console.log('📋 使用直接答案模式（避免LLM幻觉）');
+            const directAnswer = this.formatDirectAnswer(results, question);
+            return {
+                answer: directAnswer,
+                sources: Object.values(grouped),
+                retrievedChunks: results.length,
+                confidence: highestScore,
+                mode: 'direct'
+            };
+        }
+
+        // 4. 构建上下文（包含更多信息，格式更清晰）
+        const context = results.map((r, i) => {
+            const pageNum = r.page_num || r.page || '?';
+            const text = r.text || r.full_context || '';
+            return `【文档片段 ${i + 1}】
+文档名称：${r.documentName}
+页码：第${pageNum}页
+────────────────────────────────
+${text}
+────────────────────────────────`;
+        }).join('\n\n');
+
+        // 5. 生成答案
+        console.log('🔄 生成答案...');
+        const answer = await this.generateAnswer(question, context);
+
+        console.log('✅ 回答生成完成\n');
 
         return {
-            totalDocuments: indexStats.totalDocuments,
-            totalChunks: indexStats.totalChunks,
-            documents: indexStats.documents
+            answer,
+            sources: Object.values(grouped),
+            retrievedChunks: results.length,
+            confidence: highestScore
         };
     }
 
     /**
-     * 获取所有已索引文档
+     * 格式化直接答案（避免LLM幻觉）
+     * ✨ 显示全部结果，按置信度从高到低排序
+     * ✨ 每条只显示关键摘要，一眼就能看完
      */
-    getIndexedDocuments() {
-        if (!this.initialized) {
-            return [];
+    formatDirectAnswer(results, question) {
+        // ✨ 只保留置信度>50%的高质量结果
+        const highQualityResults = results
+            .filter(r => (r.fusedScore || r.score || 0) > 0.5)
+            .sort((a, b) => (b.fusedScore || b.score || 0) - (a.fusedScore || a.score || 0)); // ✨ 按置信度降序
+
+        console.log(`📊 质量过滤：${results.length}条 → ${highQualityResults.length}条（置信度>50%）`);
+
+        if (highQualityResults.length === 0) {
+            return `❌ 抱歉，没有找到相关内容
+
+💡 建议尝试：
+• 换个说法提问
+• 检查是否有错别字
+• 查阅纸质学生手册`;
         }
 
-        const stats = this.indexManager.getStatistics();
-        return stats.documents;
+        // ✨ 显示全部结果（不再限制数量）
+        let answer = `✅ 找到了${highQualityResults.length}条相关内容（按匹配度排序）\n\n`;
+
+        // 按置信度排序展示
+        for (let i = 0; i < highQualityResults.length; i++) {
+            const r = highQualityResults[i];
+            const pageNum = r.page_num || r.page || '?';
+            const confidence = Math.round((r.fusedScore || r.score || 0) * 100);
+            const text = (r.text || r.full_context || '').trim();
+            // 提取关键句（前120字符，避免太长）
+            const keySentence = text.length > 120 ? text.substring(0, 120) + '...' : text;
+
+            answer += `📄 ${r.documentName} 第${pageNum}页 [匹配度${confidence}%]\n`;
+            answer += `   ${keySentence}\n\n`;
+        }
+
+        // 底部提示
+        const topConfidence = Math.round((highQualityResults[0]?.fusedScore || highQualityResults[0]?.score || 0) * 100);
+        answer += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        answer += `💡 以上内容直接来源于学生手册\n`;
+        answer += `💡 点击"查看完整内容"可验证准确性\n`;
+        answer += `⭐ 最高匹配度：${topConfidence}%`;
+
+        return answer;
+    }
+
+    /**
+     * 获取统计
+     */
+    getStatistics() {
+        return {
+            totalDocuments: this.indexData?.documents?.length || 0,
+            totalChunks: this.indexData?.chunks?.length || 0,
+            chunksWithEmbedding: this.indexData?.chunks?.filter(c => c.embedding).length || 0,
+            documents: this.indexData?.documents || []
+        };
+    }
+
+    /**
+     * 获取已索引文档列表
+     */
+    getIndexedDocuments() {
+        return (this.indexData?.documents || []).map(doc => ({
+            documentId: doc.documentId,
+            name: doc.name,
+            displayName: doc.displayName || doc.name,
+            description: doc.description || '',
+            status: doc.status || 'indexed'
+        }));
+    }
+
+    /**
+     * 文本哈希（用于缓存）
+     */
+    hashText(text) {
+        let hash = 0;
+        for (let i = 0; i < text.length; i++) {
+            const char = text.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash;
+        }
+        return hash.toString();
+    }
+
+    /**
+     * 启动缓存清理任务
+     */
+    startCacheCleanup() {
+        // 每5分钟清理一次过期缓存
+        setInterval(() => {
+            const now = Date.now();
+            let cleanedCount = 0;
+
+            for (const [key, value] of this.answerCache.entries()) {
+                if (now - value.timestamp > this.cacheMaxAge) {
+                    this.answerCache.delete(key);
+                    cleanedCount++;
+                }
+            }
+
+            if (cleanedCount > 0) {
+                console.log(`🧹 清理了${cleanedCount}条过期答案缓存`);
+            }
+        }, 300000); // 5分钟
+    }
+
+    /**
+     * 获取缓存统计
+     */
+    getCacheStats() {
+        return {
+            answerCache: this.answerCache.size,
+            chatRequestQueue: this.chatRequestQueue.length
+        };
     }
 }
 

@@ -3,6 +3,19 @@
  * @author 内师智能体系统 (￣▽￣)ﾉ
  */
 
+// ⚠️ 重要：首先验证环境变量！
+require('dotenv').config();
+const { validateEnv } = require('./config/env-validator');
+
+// 在启动前验证所有必需的环境变量
+try {
+  validateEnv();
+} catch (error) {
+  console.error('服务启动失败：环境变量验证未通过');
+  console.error('请检查 .env 文件并重新启动服务');
+  process.exit(1);
+}
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -72,8 +85,7 @@ app.use('/api/chat', require('./routes/chat'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/export', require('./routes/export'));
 app.use('/api/intelligent', require('./routes/intelligent')); // 智能查询路由（新）
-app.use('/api/rag', require('./routes/rag')); // RAG文档问答路由（单文档版本）
-app.use('/api/rag-v2', require('./routes/ragV2')); // RAG文档问答路由（多文档版本 ✨新增）
+app.use('/api/rag-v2', require('./routes/ragV2')); // 多文档RAG问答路由
 app.use('/api/handbook', require('./routes/handbook')); // 学生手册查询路由（新增！）
 app.use('/api/index', require('./routes/index')); // 统一索引管理路由（新增！）
 app.use('/api/documents', require('./routes/documents')); // 文档管理路由（多政策系统新增！）
