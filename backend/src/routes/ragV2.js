@@ -281,10 +281,10 @@ router.post('/answer', authenticate, async (req, res) => {
         console.log('🚀 开始调用多文档RAG服务...');
 
         // 调用多文档问答服务（✨ 新增：传递documentIds参数）
-        // ✨ 优化：只返回高质量的结果，提高用户体验
+        // ✨ 优化：增加检索数量，降低阈值，确保内容完整
         const result = await ragService.ask(normalizedQuestion, {
-            topK: options.topK || 8,        // ✨ 减少到8条（只保留高相关）
-            minScore: options.minScore || 0.5,  // ✨ 提高阈值到0.5（过滤低相关）
+            topK: options.topK || 15,        // ✨ 增加到15条（确保内容完整）
+            minScore: options.minScore || 0.3,  // ✨ 降低阈值到0.3（包含更多相关内容）
             useReranking: options.useReranking !== false,
             documentIds  // ✨ 新增：文档过滤参数
         });

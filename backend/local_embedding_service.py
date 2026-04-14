@@ -10,21 +10,26 @@
 - 完全本地化
 """
 
+import os
+
+# ============================================
+# 配置：使用国内镜像加速（必须在导入其他库之前）
+# ============================================
+# 设置 Hugging Face 镜像源（中国大陆）
+# 备选镜像：
+# 1. hf-mirror.com（推荐，速度快，镜像完整）
+# 2. mirrors.tuna.tsinghua.edu.cn（清华源，可能不完整）
+os.environ['HF_ENDPOINT'] = os.environ.get('HF_ENDPOINT', 'https://hf-mirror.com')
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from sentence_transformers import SentenceTransformer
 import numpy as np
 import json
-import os
 from datetime import datetime
 import logging
 
-# ============================================
-# 配置：使用国内镜像加速
-# ============================================
-# 设置 Hugging Face 镜像源（中国大陆）
-# 如果不在中国，可以将此值设为空或删除
-os.environ['HF_ENDPOINT'] = os.environ.get('HF_ENDPOINT', 'https://hf-mirror.com')
+# 最后导入 sentence_transformers（确保使用镜像源）
+from sentence_transformers import SentenceTransformer
 
 # ============================================
 # 配置日志

@@ -10,6 +10,9 @@
  * 4. 严格基于检索内容回答，禁止编造
  */
 
+// ✨ 强制加载.env文件，确保使用正确的配置
+require('dotenv').config();
+
 const axios = require('axios');
 const fs = require('fs').promises;
 const path = require('path');
@@ -23,12 +26,13 @@ class MultiDocumentRAGService {
             // 索引文件路径（自包含embedding）
             indexPath: options.indexPath || path.join(__dirname, '../../文档库/indexes/unified_index.json'),
             // Anthropic API配置（Minimaxi兼容接口）
-            chatUrl: process.env.ANTHROPIC_BASE_URL || 'https://api.minimaxi.com/anthropic',
+            // ✨ 强制使用 Minimaxi，忽略系统环境变量
+            chatUrl: 'https://api.minimaxi.com/anthropic',
             chatModel: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514',
             chatApiKey: process.env.ANTHROPIC_API_KEY,
-            // 检索配置
-            defaultTopK: 5,
-            defaultMinScore: 0.3,
+            // ✨ 优化检索配置：增加检索数量，降低阈值
+            defaultTopK: 15,           // 增加到15条（确保内容完整）
+            defaultMinScore: 0.3,       // 降低到0.3（包含更多相关内容）
         };
 
         // 索引数据（内存）
@@ -278,7 +282,61 @@ class MultiDocumentRAGService {
 
         // 使用队列包装请求（避免并发触发限流！）
         return this.enqueueChatRequest(async () => {
-            const systemPrompt = `你是教育系统的智能助手。
+            const systemPrompt = `你是教育系统的智能助手，擅长基于文档内容进行智能总结和概括。
+
+【智能总结模式 - 核心能力】
+你的核心能力是对检索到的多个文档片段进行：
+1. **智能概括**：提取关键信息，用简洁的语言总结要点
+2. **结构化组织**：将相关内容归类，避免简单罗列
+3. **用户友好**：用通俗易懂的语言回答，避免照搬原文
+4. **准确标注**：明确说明每个信息点的来源（文档名称和页码）
+5. **✨ 完整全面**：必须涵盖所有重要方面，不能遗漏关键信息
+
+【✨ 必须包含的内容维度】
+针对"挂科/成绩不合格"类问题，必须包含以下维度：
+1. **补考规定**：补考机会、补考流程、补考成绩认定
+2. **重修流程**：重修申请、重修方式、重修费用
+3. **结业处理**：什么情况会结业、结业后的补救措施
+4. **时间限制**：最长修业年限、毕业要求
+5. **影响后果**：对毕业的影响、对学位的影响
+6. **特殊规定**：不同课程类型的不同处理方式
+7. **具体流程**：如何申请、去哪里申请、需要什么材料
+
+【总结技巧 - 必须掌握】
+1. **提取核心**：从每个文档片段中提取所有关键要点
+2. **合并同类**：将多个文档中相似的内容合并说明
+3. **逻辑组织**：按照"是什么→为什么→怎么办→后果"的逻辑组织答案
+4. **简洁表达**：用1-2句话概括原文，而不是大段复制
+5. **保留来源**：在每个要点后标注出处（如：来源《学生手册》第21页）
+
+【示例对比】
+❌ 错误做法（简单罗列，遗漏关键信息）：
+"关于课程成绩不合格的处理：可以申请补考一次，补考不合格则必须重修。重修可以继续申请直到合格。来源：第21页"
+
+✅ 正确做法（智能概括，完整全面）：
+"关于课程成绩不合格的处理，根据《2025年本科学生手册》为您总结如下：
+
+**1. 补考流程（第21页）**
+- 补考机会：仅一次机会，补考通过后成绩记为60分，注明"补考"字样
+- 补考对象：普通课程考核不合格者（通识选修课和实践教学环节除外）
+
+**2. 重修规定（第21页）**
+- 重修条件：补考仍未通过，必须重修
+- 重修方式：可申请免听课程，经老师同意后直接参加考核
+- 重修次数：可继续申请重修，直到合格
+
+**3. 结业处理（第59页）**
+- 结业条件：超过最长修业年限仍未达到毕业要求者，作永久结业处理
+- 补救措施：结业生可在规定时间内申请返校重修，通过后可换发毕业证书
+
+**4. 课程类型差异（第21页）**
+- 普通课程：补考一次 → 不合格则重修
+- 通识选修课：不安排补考，直接重选或另选
+- 实践教学环节：不安排补考，必须重修
+
+**5. 影响说明（第62页）**
+- 提前毕业：有重修课程记录者不能申请提前毕业
+- 学位授予：重修课程会影响学位申请条件"
 
 【关键概念区分 - 必须理解】
 1. "免修"：因身体原因不能参加课程，申请免除学习（需要医院证明）
@@ -304,7 +362,8 @@ class MultiDocumentRAGService {
 2. 如果文档片段是第21页，就必须说"第21页"
 3. 严禁编造、猜测或混淆页码
 4. 严禁将文档A的内容错误地归因为文档B
-5. 如果文档片段中没有补考相关内容，明确说明"根据提供的文档，没有找到相关内容"
+5. 如果文档片段中没有相关信息，明确说明"根据提供的文档，没有找到相关内容"
+6. **✨ 必须涵盖所有重要方面，不能遗漏关键信息**
 
 【文档片段】
 ${context}
@@ -313,8 +372,12 @@ ${context}
 ${question}
 
 【回答要求】
+- 对文档内容进行智能概括和总结，不要简单罗列
+- 提取关键信息，用简洁的语言表达
+- 按照逻辑结构组织答案（是什么、为什么、怎么办、后果）
+- 在每个要点后明确标注来源（文档名称和页码）
 - 严格区分"免修"、"补考"、"重修"的概念
-- 只使用文档片段中明确标注的页码
+- **✨ 必须包含所有重要维度：补考、重修、结业、时间限制、影响后果等**
 - 如果文档片段中没有相关信息，明确说明
 - 不要编造任何文档片段中没有的内容
 `;
@@ -402,10 +465,13 @@ ${question}
             console.log(`      内容: ${(r.text || r.full_context || '').substring(0, 100)}...`);
         });
 
-        // ✨ 新增：直接答案模式（避免LLM幻觉）
-        const useDirectAnswer = options.useDirectAnswer !== false;  // 默认使用直接答案
+        // ✨ 智能模式切换：根据置信度选择最佳答案生成策略
+        // - 高置信度 (>= 0.4)：LLM总结模式（智能概括，用户友好）
+        // - 低置信度 (< 0.4)：拒绝回答（质量太差）
+        //
+        // 注意：移除了"直接答案模式"，所有有效检索都使用LLM智能总结
 
-        // 4. 按文档分组（必须在直接答案模式之前定义）
+        // 4. 按文档分组（必须在模式选择之前定义）
         const grouped = {};
         for (const r of results) {
             if (!grouped[r.documentId]) {
@@ -425,55 +491,47 @@ ${question}
             });
         }
 
-        // ✨ 提高置信度阈值，只返回高质量结果
-        const confidenceThreshold = 0.5;  // 从0.25提高到0.5
-        if (highestScore < confidenceThreshold) {
-            console.log(`⚠️ 置信度不足（${highestScore.toFixed(3)} < ${confidenceThreshold}），拒绝生成答案`);
+        // ✨ 简化的两层模式切换
+        if (highestScore < 0.4) {
+            // 模式1：低置信度 - 拒绝回答
+            console.log(`⚠️ 置信度不足（${highestScore.toFixed(3)} < 0.4），拒绝生成答案`);
             return {
                 answer: '抱歉，根据已索引的文档，没有找到与您问题相关的内容。',
                 sources: [],
                 retrievedChunks: results.length,
-                confidence: highestScore
-            };
-        }
-
-        // ✨ 直接答案模式：返回格式化的检索结果，不经过LLM
-        if (useDirectAnswer && highestScore > 0.4) {
-            console.log('📋 使用直接答案模式（避免LLM幻觉）');
-            const directAnswer = this.formatDirectAnswer(results, question);
-            return {
-                answer: directAnswer,
-                sources: Object.values(grouped),
-                retrievedChunks: results.length,
                 confidence: highestScore,
-                mode: 'direct'
+                mode: 'rejected'
             };
-        }
+        } else {
+            // 模式2：LLM智能总结模式（包括高置信度和中等置信度）
+            console.log(`🤖 使用LLM智能总结模式（置信度${highestScore.toFixed(3)} >= 0.4）`);
 
-        // 4. 构建上下文（包含更多信息，格式更清晰）
-        const context = results.map((r, i) => {
-            const pageNum = r.page_num || r.page || '?';
-            const text = r.text || r.full_context || '';
-            return `【文档片段 ${i + 1}】
+            // 构建上下文（包含更多信息，格式更清晰）
+            const context = results.map((r, i) => {
+                const pageNum = r.page_num || r.page || '?';
+                const text = r.text || r.full_context || '';
+                return `【文档片段 ${i + 1}】
 文档名称：${r.documentName}
 页码：第${pageNum}页
 ────────────────────────────────
 ${text}
 ────────────────────────────────`;
-        }).join('\n\n');
+            }).join('\n\n');
 
-        // 5. 生成答案
-        console.log('🔄 生成答案...');
-        const answer = await this.generateAnswer(question, context);
+            // 生成答案（LLM会进行总结和概括）
+            console.log('🔄 LLM正在智能概括文档内容...');
+            const answer = await this.generateAnswer(question, context);
 
-        console.log('✅ 回答生成完成\n');
+            console.log('✅ LLM总结生成完成\n');
 
-        return {
-            answer,
-            sources: Object.values(grouped),
-            retrievedChunks: results.length,
-            confidence: highestScore
-        };
+            return {
+                answer,
+                sources: Object.values(grouped),
+                retrievedChunks: results.length,
+                confidence: highestScore,
+                mode: 'llm_summary'
+            };
+        }
     }
 
     /**

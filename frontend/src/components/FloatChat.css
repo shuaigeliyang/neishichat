@@ -1,19 +1,23 @@
 /**
  * 浮窗聊天组件样式
- * @author 内师智能体系统 (￣▽￣)ﾉ
+ * @author 哈雷酱大小姐 (￣▽￣)ﾉ
+ *
+ * osu! 风格深色霓虹主题
  */
 
 .float-chat-modal .ant-modal-content {
-  border-radius: 15px;
+  border-radius: var(--radius-xl);
   overflow: hidden;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-glow-lg);
+  background: var(--osu-dark-secondary);
+  border: 1px solid var(--osu-pink);
 }
 
 .float-chat-container {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #f5f5f5;
+  background: var(--osu-dark);
 }
 
 .float-chat-container.fullscreen {
@@ -21,15 +25,15 @@
   border-radius: 0;
 }
 
-/* 聊天头部 */
+/* 聊天头部 - osu! 霓虹粉渐变 */
 .float-chat-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 15px 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--gradient-primary);
   color: white;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 15px rgba(255, 102, 171, 0.4);
 }
 
 .header-left {
@@ -40,10 +44,10 @@
 
 .chat-avatar {
   font-size: 32px;
-  animation: bounce 2s infinite;
+  animation: osu-bounce 2s infinite;
 }
 
-@keyframes bounce {
+@keyframes osu-bounce {
   0%, 100% {
     transform: translateY(0);
   }
@@ -56,12 +60,14 @@
   margin: 0;
   font-size: 16px;
   font-weight: 600;
+  color: white;
 }
 
 .chat-title p {
   margin: 0;
   font-size: 12px;
   opacity: 0.9;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .header-right {
@@ -79,6 +85,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  background: transparent;
 }
 
 .header-btn:hover {
@@ -91,16 +98,18 @@
 
 .login-btn {
   background: white;
-  color: #667eea;
+  color: var(--osu-pink);
   border: none;
   font-weight: 600;
   height: 28px;
   font-size: 13px;
+  border-radius: var(--radius-md);
 }
 
 .login-btn:hover {
-  background: #f0f0f0;
-  color: #667eea;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--osu-pink);
+  box-shadow: 0 0 15px rgba(255, 102, 171, 0.5);
 }
 
 /* 聊天内容区 */
@@ -111,16 +120,16 @@
   flex-direction: column;
 }
 
-/* 访客模式提示 */
+/* 访客模式提示 - osu! 风格 */
 .guest-mode-tip {
   padding: 10px 15px;
-  background: #fff7e6;
-  border-top: 1px solid #ffd591;
+  background: rgba(255, 102, 171, 0.1);
+  border-top: 1px solid rgba(255, 102, 171, 0.3);
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: #d46b08;
+  color: var(--osu-pink);
 }
 
 .tip-icon {

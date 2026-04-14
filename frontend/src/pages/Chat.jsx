@@ -63,7 +63,7 @@ function Chat({ user }) {
    */
   const getAIIcon = (msg) => {
     if (msg.role === 'system') {
-      return <LoadingOutlined style={{ color: '#faad14' }} />;
+      return <LoadingOutlined style={{ color: '#FF99CC' }} />;
     }
 
     const content = msg.content || '';
@@ -73,20 +73,20 @@ function Chat({ user }) {
       return <SmileOutlined style={{ color: '#52c41a' }} />;
     }
     if (content.includes('💡') || content.includes('建议') || content.includes('提示')) {
-      return <BulbOutlined style={{ color: '#faad14' }} />;
+      return <BulbOutlined style={{ color: '#FF99CC' }} />;
     }
     if (content.includes('⚡') || content.includes('快速') || content.includes('立即')) {
-      return <ThunderboltOutlined style={{ color: '#1890ff' }} />;
+      return <ThunderboltOutlined style={{ color: '#FF66AB' }} />;
     }
     if (content.includes('❌') || content.includes('错误') || content.includes('失败')) {
       return <RobotOutlined style={{ color: '#ff4d4f' }} />;
     }
     if (content.includes('📊') || content.includes('查询') || content.includes('数据')) {
-      return <ThunderboltOutlined style={{ color: '#722ed1' }} />;
+      return <ThunderboltOutlined style={{ color: '#9B4DCA' }} />;
     }
 
     // 默认表情
-    return <RobotOutlined style={{ color: '#667eea' }} />;
+    return <RobotOutlined style={{ color: '#FF66AB' }} />;
   };
 
   /**
@@ -1124,7 +1124,7 @@ function Chat({ user }) {
                             <div className="rag-sources">
                               <Divider style={{ margin: '12px 0' }} />
                               <div className="sources-header">
-                                <BookOutlined style={{ color: '#1890ff' }} />
+                                <BookOutlined style={{ color: '#FF66AB' }} />
                                 <span>📖 参考来源：</span>
                                 <span className="sources-count">共 {msg.sources.length} 条</span>
                                 {msg.confidence && (
@@ -1256,9 +1256,9 @@ function Chat({ user }) {
         <div className="chat-input-area">
           {/* ✨ 新增：文档选择器 */}
           {availableDocuments.length > 0 && (
-            <div className="document-selector" style={{ marginBottom: '12px', padding: '8px 12px', background: '#f5f5f5', borderRadius: '8px' }}>
-              <BookOutlined style={{ marginRight: '8px', color: '#1890ff' }} />
-              <span style={{ marginRight: '12px', fontWeight: 500 }}>选择文档：</span>
+            <div className="document-selector" style={{ marginBottom: '12px', padding: '8px 12px', background: 'var(--osu-dark-tertiary)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+              <BookOutlined style={{ marginRight: '8px', color: '#FF66AB' }} />
+              <span style={{ marginRight: '12px', fontWeight: 500, color: '#ffffff' }}>选择文档：</span>
               <Select
                 value={selectedDocumentId}
                 onChange={(value) => {
@@ -1275,7 +1275,7 @@ function Chat({ user }) {
                 ]}
               />
               {selectedDocumentId !== 'all' && (
-                <span style={{ marginLeft: '12px', fontSize: '12px', color: '#999' }}>
+                <span style={{ marginLeft: '12px', fontSize: '12px', color: '#b8b8d0' }}>
                   仅检索：{availableDocuments.find(d => d.documentId === selectedDocumentId)?.displayName || selectedDocumentId}
                 </span>
               )}

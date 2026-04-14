@@ -140,22 +140,22 @@ function SchoolPortal() {
 
   const features = [
     {
-      icon: <RobotOutlined style={{ fontSize: '48px', color: '#667eea' }} />,
+      icon: <RobotOutlined style={{ fontSize: '48px', color: '#FF66AB' }} />,
       title: '智能助手',
       description: '24小时在线，解答您的疑问'
     },
     {
-      icon: <BarChartOutlined style={{ fontSize: '48px', color: '#52c41a' }} />,
+      icon: <BarChartOutlined style={{ fontSize: '48px', color: '#FF66AB' }} />,
       title: '成绩查询',
       description: '快速查询学业成绩和学分'
     },
     {
-      icon: <FileTextOutlined style={{ fontSize: '48px', color: '#faad14' }} />,
+      icon: <FileTextOutlined style={{ fontSize: '48px', color: '#FF66AB' }} />,
       title: '表单下载',
       description: '各类申请表格一键下载'
     },
     {
-      icon: <SolutionOutlined style={{ fontSize: '48px', color: '#1890ff' }} />,
+      icon: <SolutionOutlined style={{ fontSize: '48px', color: '#FF66AB' }} />,
       title: '政策咨询',
       description: '学生手册和政策在线查询'
     }
@@ -178,7 +178,7 @@ function SchoolPortal() {
           {user ? (
             <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
               <div className="user-info">
-                <Avatar icon={<UserOutlined />} style={{ backgroundColor: '#667eea' }} />
+                <Avatar icon={<UserOutlined />} style={{ backgroundColor: '#FF66AB' }} />
                 <span className="user-name">{user.name}</span>
                 <span className="user-type">({user.type === 'student' ? '学生' : user.type === 'teacher' ? '教师' : '管理员'})</span>
               </div>
@@ -204,7 +204,7 @@ function SchoolPortal() {
           <Col xs={24} sm={12} lg={12}>
             <Card className="content-card" hoverable>
               <div className="card-icon">
-                <BankOutlined style={{ fontSize: '48px', color: '#667eea' }} />
+                <BankOutlined style={{ fontSize: '48px', color: '#FF66AB' }} />
               </div>
               <Title level={3}>学校简介</Title>
               <Paragraph className="card-content">
@@ -220,7 +220,7 @@ function SchoolPortal() {
           <Col xs={24} sm={12} lg={12}>
             <Card className="content-card" hoverable>
               <div className="card-icon">
-                <TrophyOutlined style={{ fontSize: '48px', color: '#faad14' }} />
+                <TrophyOutlined style={{ fontSize: '48px', color: '#FF99CC' }} />
               </div>
               <Title level={3}>办学特色</Title>
               <ul className="card-content">
@@ -237,7 +237,7 @@ function SchoolPortal() {
           <Col xs={24} sm={12} lg={12}>
             <Card className="content-card" hoverable>
               <div className="card-icon">
-                <BookOutlined style={{ fontSize: '48px', color: '#52c41a' }} />
+                <BookOutlined style={{ fontSize: '48px', color: '#B06DD6' }} />
               </div>
               <Title level={3}>专业设置</Title>
               <Paragraph className="card-content">
@@ -252,7 +252,7 @@ function SchoolPortal() {
           <Col xs={24} sm={12} lg={12}>
             <Card className="content-card" hoverable>
               <div className="card-icon">
-                <TeamOutlined style={{ fontSize: '48px', color: '#1890ff' }} />
+                <TeamOutlined style={{ fontSize: '48px', color: '#9B4DCA' }} />
               </div>
               <Title level={3}>校园文化</Title>
               <ul className="card-content">
